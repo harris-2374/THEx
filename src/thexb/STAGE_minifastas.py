@@ -8,11 +8,10 @@ entity.
 """
 import logging
 from multiprocessing import Process
-from pathlib import Path
 import os
-import time
 import textwrap
 
+from tqdm import tqdm
 from pyfaidx import Fasta
 
 from thexb.UTIL_checks import check_fasta
@@ -25,7 +24,7 @@ def set_logger(WORKING_DIR, LOG_LEVEL):
     # if os.path.exists(WORKING_DIR / 'logs/fasta_windower.log'):  # Remove existing log file if present
     #     os.remove(WORKING_DIR / 'logs/fasta_windower.log')
     formatter = logging.Formatter('%(levelname)s: %(message)s')
-    file_handler = logging.FileHandler(WORKING_DIR / 'logs/fasta_windower.log')
+    file_handler = logging.FileHandler(WORKING_DIR / 'logs/minifastas.log')
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
     logger.addHandler(file_handler)
@@ -43,32 +42,35 @@ def parse_chromosome_into_windows(f, WORKING_DIR, WINDOW_SIZE_INT):
             windowed_outdir = WORKING_DIR / 'windowed_fastas' / f"{chromosome}"
             windowed_outdir.mkdir(parents=True, exist_ok=True)
             flag = True
-            for header in list(headers):
-                logger.info(f"Parsing {header} into {WINDOW_SIZE_INT} base pair windows for chromosome {chromosome}")
-                try:
-                    sample_seq_df = {str(header): list(fasta_file[str(header)][:].seq)}
-                except KeyError:
-                    break
-                # Need to add 1 to capture last bits of sequence in last window that will be less than WINDOW_SIZE_INT
-                number_of_out_seqs = (len(sample_seq_df[str(header)]) // WINDOW_SIZE_INT + 1)
+            tqdm_text = "#" + f"{chromosome}"
+            with tqdm(total=len(headers), desc=tqdm_text) as pbar:
+                for header in list(headers):
+                    # logger.info(f"Parsing {header} into {WINDOW_SIZE_INT:,} base pair windows for chromosome {chromosome}")
+                    try:
+                        sample_seq_df = {str(header): list(fasta_file[str(header)][:].seq)}
+                    except KeyError:
+                        break
+                    # Need to add 1 to capture last bits of sequence in last window that will be less than WINDOW_SIZE_INT
+                    number_of_out_seqs = (len(sample_seq_df[str(header)]) // WINDOW_SIZE_INT + 1)
 
-                start_position = 1
-                end_position = WINDOW_SIZE_INT
+                    start_position = 1
+                    end_position = WINDOW_SIZE_INT
 
-                for _ in range(number_of_out_seqs):
-                    current_file_path = windowed_outdir / f"{chromosome}_{start_position}_{end_position}.fasta"
-                    if flag:
-                        if current_file_path.is_file():
-                            os.remove(current_file_path)
-                        else:
-                            pass
-                    with open(current_file_path, 'a') as current_file: 
-                        seq = textwrap.wrap("".join(list(sample_seq_df[str(header)][start_position:end_position])), 80)
-                        current_file.write(">{}\n".format(header))
-                        current_file.write("{}\n".format("\n".join(seq)))
-                        start_position += WINDOW_SIZE_INT
-                        end_position += WINDOW_SIZE_INT
-                flag = False
+                    for _ in range(number_of_out_seqs):
+                        current_file_path = windowed_outdir / f"{chromosome}_{start_position}_{end_position}.fasta"
+                        if flag:
+                            if current_file_path.is_file():
+                                os.remove(current_file_path)
+                            else:
+                                pass
+                        with open(current_file_path, 'a') as current_file: 
+                            seq = textwrap.wrap("".join(list(sample_seq_df[str(header)][start_position:end_position])), 80)
+                            current_file.write(">{}\n".format(header))
+                            current_file.write("{}\n".format("\n".join(seq)))
+                            start_position += WINDOW_SIZE_INT
+                            end_position += WINDOW_SIZE_INT
+                    flag = False
+                    pbar.update(1)
     except:
         logger.warning(f"Run failed with file {chromosome}")
     return

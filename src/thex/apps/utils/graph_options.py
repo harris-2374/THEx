@@ -88,38 +88,28 @@ def color_swatches():
     return color_swatches
 
 
-def pixel_sizes():
-    ls = [
-        '200x1000',
-        '625x400',
-        '300x700',
-        '1250x800',
-        '1350x1000',
-        '750x550',
-        '1250x800',
-        '1250x1300',
-    ]
-    return ls
-
-
 def figure_output_scales():
     return [0.25, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]
 
 
 def graph_templates():
-    return ['ggplot2', 'plotly', 'plotly_white', 'plotly_dark', 'presentation', 'seaborn', 'simple_white', 'xgridoff', 'ygridoff', 'gridon']
+    return ['plotly', 'plotly_white', 'plotly_dark', 'ggplot2', 'presentation', 'seaborn', 'simple_white']
 
 
 def snapshot_file_type():
     return ['svg', 'jpeg', 'png', 'webp']
 
 
-def line_width_options():
+def marker_width_options():
     options = ['0.5', '0.75', '1.0', '1.25', '1.5', '1.75', '2.0', '2.25', '2.5']
     return [{'label': s, 'value': s} for s in options]
 
 
 def font_size_options():
-    options = ["5", "10", "15", "20", "25", "30", "35", "40", "45"]
     return [{'label': s, 'value': s} for s in range(5, 50, 1)]
 
+def font_families():
+    return ["Arial", "Balto", "Courier New", 
+            "Droid Sans", "Droid Serif", "Droid Sans Mono", 
+            "Gravitas One", "Old Standard TT", "Open Sans", 
+            "Overpass", "PT Sans Narrow", "Raleway", "Times New Roman"]

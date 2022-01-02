@@ -10,15 +10,17 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # -------------------- Graphing Functions --------------------
-def single_chromosome_graph(
+def single_chromosome_graph_line(
     df,
     chromosome,
     chosen_template,
-    line_width,
+    marker_width,
     colors,
     font_size,
     xaxis_gridlines,
     yaxis_gridlines,
+    font_family,
+    samples,
 ):
     """ Filter out current chromosome and set x- and y-max"""
     curr_chrom_data = df[df["Chromosome"] == chromosome]
@@ -27,6 +29,7 @@ def single_chromosome_graph(
         curr_chrom_data,
         x='Window',
         y='Value',
+        category_orders={"Sample": samples},
         color='Sample',
         color_discrete_sequence=colors,
         height=500,
@@ -34,13 +37,7 @@ def single_chromosome_graph(
     fig.update_layout(
         font=dict(
             size=font_size,
-        ),
-        # hovermode="x unified",
-        margin=dict(
-            l=60,
-            r=50,
-            b=60,
-            t=30,
+            family=font_family,
         ),
         legend=dict(
             itemsizing='trace',
@@ -56,32 +53,90 @@ def single_chromosome_graph(
     )
     fig.update_xaxes(
         title="Position",
+        rangemode='tozero',
         showgrid=xaxis_gridlines,
     )
     fig.update_yaxes(
-        title="p-distance",
+        title="Value",
         range=[0, y_max],
         fixedrange=True,
-        ticklen=5,
         showgrid=yaxis_gridlines,
     )
     fig.update_traces(
-        line=dict(width=float(line_width)),
+        line=dict(width=float(marker_width)),
     )
     return fig
 
-def whole_genome(
+def single_chromosome_graph_scatter(
+    df,
+    chromosome,
+    chosen_template,
+    marker_width,
+    colors,
+    font_size,
+    xaxis_gridlines,
+    yaxis_gridlines,
+    font_family,
+    samples,
+):
+    """ Filter out current chromosome and set x- and y-max"""
+    curr_chrom_data = df[df["Chromosome"] == chromosome]
+    y_max = float(curr_chrom_data["Value"].max())
+    fig = px.scatter(
+        curr_chrom_data,
+        x='Window',
+        y='Value',
+        category_orders={"Sample": samples},
+        color='Sample',
+        color_discrete_sequence=colors,
+        height=500,
+    )
+    fig.update_layout(
+        font=dict(
+            size=font_size,
+            family=font_family,
+        ),
+        legend=dict(
+            itemsizing='trace',
+            orientation="h",
+            xanchor="left",
+            x=0,
+            y=1.02,
+            yanchor="bottom",
+        ),
+        showlegend=True,
+        template=chosen_template,
+        title_x=0.5,
+    )
+    fig.update_xaxes(
+        title="Position",
+        rangemode='tozero',
+        showgrid=xaxis_gridlines,
+    )
+    fig.update_yaxes(
+        title="Value",
+        range=[0, y_max],
+        fixedrange=True,
+        showgrid=yaxis_gridlines,
+    )
+    fig.update_traces(
+        marker=dict(size=float(marker_width)),
+    )
+    return fig
+
+def whole_genome_line(
     df,
     chromosomes,
     samples,
     colors,
-    line_width,
+    marker_width,
     template,
     font_size,
     y_max,
     x_max,
     xaxis_gridlines,
     yaxis_gridlines,
+    font_family,
 ):
     fig = make_subplots(
         rows=len(chromosomes),
@@ -89,7 +144,7 @@ def whole_genome(
         x_title="Position",
         y_title="Edit Me!",
         row_titles=chromosomes,
-        row_heights=[3]*len(chromosomes),
+        row_heights=[2]*len(chromosomes),
     )
     for n, sample in enumerate(samples):
         legend_flag = True
@@ -106,7 +161,7 @@ def whole_genome(
                     name=sample,
                     line=dict(
                         color=colors[n],
-                        width=float(line_width)
+                        width=float(marker_width)
                     ),
                     showlegend=legend_flag,
                 ),
@@ -117,8 +172,8 @@ def whole_genome(
             continue
     # --- Update Figure ---
     fig.update_layout(
-        font=dict(size=font_size),
-        height=150*len(chromosomes),
+        font=dict(size=font_size, family=font_family),
+        height=125*len(chromosomes),
         hovermode="x unified",
         legend=dict(
             orientation="h",
@@ -137,6 +192,7 @@ def whole_genome(
         ),
         template=template,
         title_x=0.5,
+        font_family="Arial",
     )
     fig.update_xaxes(
         fixedrange=True,
@@ -156,6 +212,110 @@ def whole_genome(
         annotation['textangle']=0
         annotation['align']="center"
     return fig
+
+
+def whole_genome_scatter(
+    df,
+    chromosomes,
+    samples,
+    colors,
+    marker_width,
+    template,
+    font_size,
+    y_max,
+    x_max,
+    xaxis_gridlines,
+    yaxis_gridlines,
+    font_family,
+):
+    # fig = make_subplots(
+    #     rows=len(chromosomes),
+    #     cols=1,
+    #     x_title="Position",
+    #     y_title="Edit Me!",
+    #     row_titles=chromosomes,
+    #     row_heights=[2]*len(chromosomes),
+    # )
+    # for n, sample in enumerate(samples):
+    #     legend_flag = True
+    #     for row, current_chromosome in enumerate(chromosomes, start=1):
+    #         filt = (df['Chromosome'] == current_chromosome) & (df["Sample"] == sample)
+    #         sample_chromosome_data = df[filt]
+    #         # Make figure
+    #         fig.add_trace(
+    #             go.Scatter(
+    #                 x=sample_chromosome_data['Window'],
+    #                 y=sample_chromosome_data['Value'],
+    #                 mode='markers',
+    #                 legendgroup=str(sample),
+    #                 name=sample,
+    #                 line=dict(
+    #                     color=colors[n],
+    #                     width=float(marker_width)
+    #                 ),
+    #                 showlegend=legend_flag,
+    #             ),
+    #             row=row,
+    #             col=1
+    #         )
+    #         legend_flag = False
+    #         continue
+
+    fig = px.scatter(
+        df,
+        x='Window',
+        y='Value',
+        category_orders={"Sample": samples},
+        color='Sample',
+        color_discrete_sequence=colors,
+        # height=500,
+        facet_row="Chromosome",
+    )
+    # --- Update Figure ---
+    fig.update_layout(
+        font=dict(size=font_size, family=font_family),
+        height=125*len(chromosomes),
+        hovermode="x unified",
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+            itemsizing='trace',
+            title="",
+        ),
+        margin=dict(
+            l=60,
+            r=50,
+            b=60,
+            t=10,
+        ),
+        template=template,
+        title_x=0.5,
+        font_family=font_family,
+    )
+    fig.update_xaxes(
+        fixedrange=True,
+        range=[0, x_max],
+        showgrid=xaxis_gridlines,
+    )
+    fig.update_yaxes(
+        range=[0.0, y_max],
+        fixedrange=True,
+        showgrid=yaxis_gridlines,
+        title='',
+    )
+    fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+    fig.update_traces(marker=dict(size=float(marker_width)))
+    # Rotate chromosome names to 0-degrees
+    for annotation in fig['layout']['annotations']:
+        if annotation['text'] == "Edit Me!":
+            continue
+        annotation['textangle']=0
+        annotation['align']="center"
+    return fig
+
 
 # -------------------- File Validation --------------------
 

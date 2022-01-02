@@ -16,14 +16,14 @@ drop_windows = True
 percent_of_chromosome_to_run = 0.1
 
 [Pairwise Filter]
-reference_name = Pbe53_Ref
+reference_name = REFERENCE
 filter_window_size = 100bp
 step = 10bp
 min_seq_len = 1000bp
-min_pDistance_cutoff = 0.024
+max_pDistance_cutoff = 0.024
 Zscore = 2
 pairwise_coverage_cutoff = 0.9
-exclude_list = Pbe53_Ref
+exclude_list = REFERENCE
 missing_char = N
 
 [IQ-TREE]
@@ -31,7 +31,7 @@ model = GTR*H4
 bootstrap = 1000
 cores_per_job = 4
 
-[TOPOBIN]
+[Topobinner]
 rooted_trees = False
 
 [Logging]

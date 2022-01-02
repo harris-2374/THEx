@@ -22,9 +22,6 @@ from thexb.UTIL_checks import check_fasta
 ############################### Set up logger #################################
 logger = logging.getLogger(__name__)
 def set_logger_level(WORKING_DIR, LOG_LEVEL):
-    # # Remove existing log file if present
-    # if os.path.exists(WORKING_DIR / 'logs/pairwise_estimator.log'):
-    #     os.remove(WORKING_DIR / 'logs/pairwise_estimator.log')
     formatter = logging.Formatter('%(levelname)s: %(message)s')
     file_handler = logging.FileHandler(WORKING_DIR / 'logs/pairwise_estimator.log')
     file_handler.setFormatter(formatter)
@@ -78,7 +75,11 @@ def p_distance(random_windows, PW_REF):
     for f in random_windows:
         with Fasta(f.as_posix(), 'fasta') as fh:
             headers = [k for k in fh.keys()]
-            assert PW_REF in headers
+            try:
+                assert PW_REF in headers
+            except AssertionError:
+                logger.error(f"Provided reference, {PW_REF}, was not found in file headers. Please check reference or input file and rerun")
+                exit()
             headers.pop(headers.index(PW_REF))
             ref_seq = fh[PW_REF][:].seq
             for sample in headers:
@@ -113,16 +114,16 @@ def return_suggested_parameters(avg_coverage, p_distance_median):
     max_coverage = max([c for c in avg_coverage.values()])
     suggest_cov = round(max_coverage * 0.9, 4)
 
-    # The suggested p-distance is given as 110%% of the max p-distance
+    # The suggested p-distance is given as 110% of the max p-distance
     max_pdist = max([d for d in p_distance_median.values()])
     suggested_pdist = round((max_pdist * 1.1), 4)
 
-    avg_pdist = statistics.median([d for d in p_distance_median.values()])
+    median_pdist = statistics.median([d for d in p_distance_median.values()])
     std_pdist = statistics.stdev([d for d in p_distance_median.values()])
 
     # Z-score rounded up to nearest whole number
     try:
-        zscore = math.ceil((max_pdist - avg_pdist) / std_pdist)
+        zscore = math.ceil((max_pdist - median_pdist) / std_pdist)
     except ZeroDivisionError:
         zscore = 1
     return suggested_pdist, zscore, suggest_cov
@@ -143,10 +144,18 @@ def pairwise_estimator(filtered_indir, PW_REF, PW_EST_PERCENT_CHROM, WORKING_DIR
         windows = [f for f in chrom.iterdir() if check_fasta(f) & ("-DROPPED" not in f.name)]
         logger.info(f"Collecting {int(len(windows) * PW_EST_PERCENT_CHROM)} windows from Chromosome {chrom.stem}")
         random_file_nums = [random.randint(0, int(len(windows) * PW_EST_PERCENT_CHROM)) for _ in range(int(len(windows) * PW_EST_PERCENT_CHROM))]
-        random_chrom_windows = [windows[i] for i in random_file_nums]
-        all_random_chrom_files += random_chrom_windows
+        try:
+            random_chrom_windows = [windows[i] for i in random_file_nums]
+            all_random_chrom_files += random_chrom_windows
+        except IndexError:
+            logger.info(f"Error encountered. Possibly too few files to run. Check input parameters and rerun.")
         continue
-    
+    # Ensure there are windows collected
+    try:
+        assert len(all_random_chrom_files) > 0
+    except AssertionError:
+        logger.error("*** No files were collected. Increase percentage of chromosome sampled and rerun ***")
+        return
     logger.info(f"Number of random windows: {len(all_random_chrom_files):,}\n")
     # Calculate average + median coverage per sample + log
     avg_coverage, cov_median = coverage_and_median(all_random_chrom_files)
@@ -171,10 +180,13 @@ def pairwise_estimator(filtered_indir, PW_REF, PW_EST_PERCENT_CHROM, WORKING_DIR
     # Output suggested input parameters
     suggested_pdist, zscore, suggest_cov = return_suggested_parameters(avg_coverage, pdist_median)
     logger.info("Suggest input parameters:")
+    logger.info(f"Note! - Suggested parameters are calculated as (maximum sampled coverage * 0.9), (maximum sampled p-distance * 1.1)")
+    logger.info(f"Note! - Suggested z-score is calculated based on maximum and median (rather than mean) suggested sampled p-distance")
     logger.info("-----------------")
-    logger.info(f"min_pDistance_cutoff = {suggested_pdist}\nZscore = {zscore}\npairwise_coverage_cutoff = {suggest_cov}")
-    logger.info("-----------------\n")
-
+    logger.info(f"max_pDistance_cutoff = {suggested_pdist}")
+    logger.info(f"Zscore = {zscore}")
+    logger.info(f"pairwise_coverage_cutoff = {suggest_cov}")
+    logger.info("-----------------")
     return
 
 

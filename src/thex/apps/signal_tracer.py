@@ -15,6 +15,7 @@ import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_table as dt
+import dash_daq as daq
 import plotly.express as px
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
@@ -27,8 +28,8 @@ from thex.apps.docs import docs_pdist_contents
 GRAPH_TEMPLATES = graph_options.graph_templates()
 SNAPSHOT_FILE_OPTIONS = graph_options.snapshot_file_type()
 COLOR_SWATCHES = graph_options.color_swatches()
-OUTPUT_PIXEL_SIZES = graph_options.pixel_sizes()
 SCALE_OPTIONS = graph_options.figure_output_scales()
+FONT_FAMILIES = graph_options.font_families()
 
 colorscales = px.colors.named_colorscales()
 
@@ -69,40 +70,11 @@ tv_video = html.Div(children = [
     ])
 
 
-docs_overview_contents = html.Div(
-    children=[
-        dbc.Col([
-            # tv_video,
-            html.H2(
-                children=["Usage"],
-                className="tv-docs-content-title"
-            ),
-            dcc.Markdown(
-                children=[
-                """
-                Signal Tracer (ST) is a simple dashboard that visualizes window-based values calculated from multi-alignment sequences. It provides an easy way to investigate relationships at 
-                local and global levels through single chromosome and whole genome viewing capabilities. Upon entering Signal Tracer, a new session pop-up will appear prompting you to upload 
-                your data. Click submit once the “Load File” button turns green. From there you can switch between chromosomes or change to whole genome view and explore your data. You are able
-                to zoom in and out of regions, pan across chromosomesomes, and add/remove samples by clicking their legend labels. 
-	            
-                This dashboard was originally designed to visualize raw p-distances signal across the genome, so THExBuilder comes will a “--pdistance” command to generate input files for 
-                Signal Tracer from multi-alignment fasta files. Visit the p-Distance Pipeline in the THExBuilder documentation for more information.   
-
-                """
-                ],
-                className="tv-docs-content-text"
-            ),
-        ], width={"size": 6, "offset": 3}),
-    ],
-    className="pdist-docs-content-scroll-div"
-)
-
 docs_input_structure_contents = html.Div(
     children=[
         dbc.Col([
             html.H2(
                 children=["Input File Structure"],
-                className="tv-docs-content-title"
             ),
             dcc.Markdown(
                 children=[
@@ -111,7 +83,6 @@ docs_input_structure_contents = html.Div(
                 Chromosome, Window, Sample, and pDistance. Ensure the headers of your input file match the example headers!
                 """
                 ],
-                className="tv-docs-content-text"
             ),
             html.Div([
                 dt.DataTable(
@@ -134,7 +105,7 @@ docs_input_structure_contents = html.Div(
                         }
                     ],
                 ),
-            ],className="tv-docs-content-text"),
+            ]),
             html.Hr(style={"background-color": "white"}),
         ], width={"size": 6, "offset": 3}),
     ],
@@ -146,7 +117,6 @@ docs_graphing_options_contents = html.Div(
         dbc.Col([
             html.H2(
                 children=["Graph Customization"],
-                className="tv-docs-content-title"
             ),
             dcc.Markdown(
                 children=[
@@ -157,12 +127,10 @@ docs_graphing_options_contents = html.Div(
                 the output dimensions in pixels, however leaving the inputs blank will revert each graph to default dimensions that are optimized for a word document or pdf file.
                 """
                 ],
-                className="tv-docs-content-text"
             ),
             html.Hr(style={"background-color": "white"}),
             html.H2(
                 children=["Export Options"],
-                className="tv-docs-content-title"
             ),
             dcc.Markdown(
                 children=[
@@ -171,7 +139,6 @@ docs_graphing_options_contents = html.Div(
                 chromosome view and then clicking “File -> Current View” will bring up a download prompt where you can choose what to name the new file and where to download it to. 
                 """
                 ],
-                className="tv-docs-content-text"
             ),
         ], width={"size": 6, "offset": 3}),
     ],
@@ -181,66 +148,59 @@ docs_content = html.Div(id="pdist-docs-content", className="pdist-docs-body")
 
 navbar = dbc.Navbar(
     [
-        html.A(
-            dbc.Row(
-                [
-                    dbc.Col(dbc.Button(
-                        id="home-button",
-                        children=[
-                            html.Img(src=app.get_asset_url("p-distance-logo-V7-71pt.svg"), height='40px'),
-                        ],
-                        className="logo-png",
-                        href="/",
-                        outline=True,
-                    ), width='auto'),
-                    dbc.Col(dbc.NavbarBrand("Signal Tracer", className="m-2")),
-                ],
-                align="center",
-                no_gutters=True,
-                className="nav-toolbar",
-            ),
-        ),
-        dbc.DropdownMenu(
+        dbc.Col(dbc.Button(
+            id="home-button",
             children=[
-                dbc.DropdownMenuItem("Import Options", header=True, className="file-menu-header"),
-                dbc.DropdownMenuItem("New Session", id="upload-file-button"),
-                dbc.DropdownMenuItem("GFF/GTF", id="pdist-gff-init-upload-button"),
-                dbc.DropdownMenuItem(divider=True),
-                dbc.DropdownMenuItem("Export Options", header=True, className="file-menu-header"),
-                dbc.DropdownMenuItem("Current View", id="pdist-curr-view-button"),
+                html.Img(src=app.get_asset_url("p-distance-logo-V7-71pt.svg"), height='40px'),
             ],
-            className="nav-button",
-            label="File",
-            nav=True,
-            in_navbar=True,
-        ),
-        # Toolbar
-        dbc.NavItem(
-            dbc.NavLink(
-                f"Toolbar",
-                id=f"pdist-toggle-toolbar",
+            className="logo-png",
+            href="/",
+            outline=True,
+        ), width='auto'),
+        dbc.Col(dbc.NavbarBrand("Signal Tracer", className="m-2"), width='auto'),
+        dbc.Col([
+            dbc.DropdownMenu(
+                children=[
+                    dbc.DropdownMenuItem("Import Options", header=True, className="file-menu-header"),
+                    dbc.DropdownMenuItem("New Session", id="upload-file-button"),
+                    dbc.DropdownMenuItem("GFF/GTF", id="pdist-gff-init-upload-button"),
+                    dbc.DropdownMenuItem(divider=True),
+                    dbc.DropdownMenuItem("Export Options", header=True, className="file-menu-header"),
+                    dbc.DropdownMenuItem("Current View", id="pdist-curr-view-button"),
+                ],
+                className="nav-button",
+                label="File",
+                nav=True,
+                in_navbar=True,
+            ),
+            # Toolbar
+            dbc.NavItem(
+                dbc.NavLink(
+                    f"Toolbar",
+                    id=f"pdist-toggle-toolbar",
+                    className="nav-button",
+                ),
                 className="nav-button",
             ),
-            className="nav-button",
-        ),
-        # Graph Options
-        dbc.NavItem(
-            dbc.NavLink(
-                f"Graph Customization",
-                id=f"pdist-toggle-plot-options",
+            # Graph Options
+            dbc.NavItem(
+                dbc.NavLink(
+                    f"Graph Customization",
+                    id=f"pdist-toggle-plot-options",
+                    className="nav-button",
+                ),
                 className="nav-button",
             ),
-            className="nav-button",
-        ),
-        # Docs
-        dbc.NavItem(
-            dbc.NavLink(
-                f"Docs",
-                id=f"pdist-toggle-docs",
+            # Docs
+            dbc.NavItem(
+                dbc.NavLink(
+                    f"Docs",
+                    id=f"pdist-toggle-docs",
+                    className="nav-button",
+                ),
                 className="nav-button",
             ),
-            className="nav-button",
-        ),
+        ]),
     ],
     color="orange",
     expand=True,
@@ -292,6 +252,24 @@ main_input_button = dbc.InputGroup(
     size='lg',
 )
 
+view_toggle = daq.ToggleSwitch(
+    id="view-option",
+    disabled=True,
+    value=False,
+    label=[{'label': 'View | Chromosome ', 'style': {"font-size": '12pt'}}, {'label': 'Whole Genome', 'style': {"font-size": '12pt'}}],
+    color="#375a7f",
+    style={"color": "black"},
+    size=25,
+    theme='dark',
+)
+
+
+color_step_buttons = html.Div([
+    dbc.Button("<", id='st-step-down-button', size='sm'),
+    html.Div(["Shift"], style={'margin': '5px 5px 5px 5px', 'color': 'black'}),
+    dbc.Button(">", id='st-step-up-button', size='sm'),
+], style={'display': 'inline-flex'})
+
 ######################################  Layout  #####################################
 def signalTracer_layout():
     layout = dbc.Container(
@@ -300,6 +278,7 @@ def signalTracer_layout():
             # Current View Download Component
             dcc.Download(id="pdist-current-view-download"),
             dcc.Download(id="pdist-gff-current-view-download"),
+            dcc.Store(id="color-palette"),
             # Tool tips
             dbc.Tooltip(
                 "Return to homepage",
@@ -498,32 +477,30 @@ def signalTracer_layout():
                                                             value="plotly_dark",
                                                             style={
                                                                 "color": "black"
-                                                            }
+                                                            },
+                                                            clearable=False,
                                                         ),
                                                     ],
                                                     className='sm-margin',
                                                     width=2,
                                                 ),
-                                                # Line Colors
+                                                # --- Font Family ---
                                                 dbc.Col(
                                                     children=[
                                                         html.H6(
-                                                            children=['Line Colors:'],
-                                                            className="text-divs",
+                                                            "Font Family:",
+                                                            style={'color': 'black'},
                                                         ),
                                                         dcc.Dropdown(
-                                                            id="line-color-option",
-                                                            className='dropdown-style',
-                                                            options=[{'label': f"{i} - {len(COLOR_SWATCHES[i])} colors", 'value': i}
-                                                                    for i in COLOR_SWATCHES],
-                                                            value="Plotly",
-                                                            style={
-                                                                "color": "black"
-                                                            }
+                                                            id="st-font-family-option",
+                                                            options=[{"label": i, "value": i} for i in FONT_FAMILIES],
+                                                            value="Arial",
+                                                            clearable=False,
+                                                            className="dropdown-style",
                                                         ),
                                                     ],
                                                     className='sm-margin',
-                                                    width=2,
+                                                    width=1,
                                                 ),
                                                 # Snapshot fileType
                                                 dbc.Col(
@@ -540,11 +517,12 @@ def signalTracer_layout():
                                                             value="svg",
                                                             style={
                                                                 "color": "black"
-                                                            }
+                                                            },
+                                                            clearable=False,
                                                         ),
                                                     ],
                                                     className='sm-margin',
-                                                    width=2,
+                                                    width=1,
                                                 ),
                                                 # --- Axis line width ---
                                                 dbc.Col(
@@ -563,7 +541,7 @@ def signalTracer_layout():
                                                         ),
                                                     ],
                                                     className="sm-margin",
-                                                    width=2,
+                                                    width=1,
                                                 ),
                                                 # --- Pixel output size ---
                                                 dbc.Col(
@@ -588,23 +566,25 @@ def signalTracer_layout():
                                         ),
                                         dbc.Row(
                                             children=[
-                                                # Line Width
+                                                # Line Colors
                                                 dbc.Col(
                                                     children=[
                                                         html.H6(
-                                                            children=['Line Width:'],
+                                                            children=['Line Colors:'],
                                                             className="text-divs",
                                                         ),
-                                                        dcc.Dropdown(
-                                                            id='line_width_options',
-                                                            className='dropdown-style',
-                                                            options=graph_options.line_width_options(),
-                                                            value=graph_options.line_width_options()[1]['value'],
-                                                            style={
-                                                                "color": "black",
-                                                                # "width": "75%",
-                                                            },
-                                                        ),
+                                                        html.Div([
+                                                            dcc.Dropdown(
+                                                                id="line-color-option",
+                                                                className='dropdown-style',
+                                                                options=[{'label': f"{i} - {len(COLOR_SWATCHES[i])} colors", 'value': i}
+                                                                        for i in COLOR_SWATCHES],
+                                                                value="Plotly",
+                                                                style={'color': 'black', 'width': '98%'},
+                                                                clearable=False,
+                                                            ),
+                                                            color_step_buttons,
+                                                        ], style={'display': 'inline-flex', 'width': '100%'},)
                                                     ],
                                                     className='sm-margin',
                                                     width=2,
@@ -613,7 +593,7 @@ def signalTracer_layout():
                                                 dbc.Col(
                                                     children=[
                                                         html.H6(
-                                                            children=['Graph Font Size:'],
+                                                            children=['Font Size:'],
                                                             className="text-divs",
                                                         ),
                                                         dcc.Dropdown(
@@ -622,16 +602,17 @@ def signalTracer_layout():
                                                             options=graph_options.font_size_options(),
                                                             value=12,
                                                             style={'color': 'black'},
+                                                            clearable=False,
                                                         ),
                                                     ],
                                                     className='sm-margin',
-                                                    width=2,
+                                                    width=1,
                                                 ),
                                                 # Snapshot Scale
                                                 dbc.Col(
                                                     children=[
                                                         html.H6(
-                                                            children=['Snapshot Output Scale:'],
+                                                            children=['Snapshot Scale:'],
                                                             className="text-divs",
                                                         ),
                                                         dcc.Dropdown(
@@ -642,11 +623,31 @@ def signalTracer_layout():
                                                             value=1,
                                                             style={
                                                                 "color": "black"
-                                                            }
+                                                            },
+                                                            clearable=False,
                                                         ),
                                                     ],
                                                     className='sm-margin',
-                                                    width=2,
+                                                    width=1,
+                                                ),
+                                                # Marker Width
+                                                dbc.Col(
+                                                    children=[
+                                                        html.H6(
+                                                            children=['Marker Width:'],
+                                                            className="text-divs",
+                                                            style={
+                                                                "color": "black",
+                                                            },
+                                                        ),
+                                                        dcc.Input(
+                                                            id="marker_width_options",
+                                                            type="number", value=1.0,
+                                                            style={'width': '100%', 'height': '50%'},
+                                                        ),
+                                                    ],
+                                                    className='sm-margin',
+                                                    width=1,
                                                 ),
                                                 # --- Axis Grid Lines ---
                                                 dbc.Col(
@@ -692,31 +693,9 @@ def signalTracer_layout():
                                                         ),
                                                     ],
                                                     className="sm-margin",
-                                                    width='auto',
+                                                    width=1,
+                                                    align='center',
                                                 ),
-                                                # dbc.Col(
-                                                #     children=[
-                                                #         html.Div(
-                                                #             children=['Number of Columns:'],
-                                                #             className='pdist-title',
-                                                #         ),
-                                                #         # dcc.Dropdown(
-                                                #         #     id='font_size_options',
-                                                #         #     options=graph_options.font_size_options(),
-                                                #         #     value=15,
-                                                #         #     style={'color': 'black'},
-                                                #         # ),
-                                                #         dcc.RadioItems(
-                                                #             id='facet_col_num',
-                                                #             options=[
-                                                #                 {'label': '1', 'value': 1},
-                                                #                 {'label': '2', 'value': 2},
-                                                #             ],
-                                                #             value=1,
-                                                #         )
-                                                #     ],
-                                                #     className='sm-margin',
-                                                # ),
                                             ],
                                             style={'background': 'orange', 'border-radius': '0px 0px 5px 5px', 'margin-bottom': '10px'},
                                             no_gutters=True,
@@ -738,71 +717,53 @@ def signalTracer_layout():
                                 dbc.CardBody(
                                     dbc.Row(
                                         children=[
-                                            # --- Upload Button ---
-                                            # dbc.Col(
-                                            #     children=[
-                                            #         html.Div(
-                                            #             children=[
-                                            #                 dcc.Upload(id='pd-upload-data', children=[dbc.Button(id='pd-upload-file-button', children=['Load File'], className="pdist-upload-button", color='primary')]),
-                                            #             ],
-                                            #         )
-                                            #     ],
-                                            #     className='sm-margin',
-                                            #     width=0.5,
-                                            # ),
-                                            # --- Chromosome View ---
+                                            # Graph type
                                             dbc.Col(
-                                                className='col-divs',
+                                                style={'padding': '5px', 'display': 'inline-flex'},
+                                                align='center',
                                                 children=[
-                                                    html.H6(
-                                                        children=['View:'],
-                                                        className='pdist-title',
-                                                    ),
-                                                    dcc.Dropdown(
-                                                        id='chromosome-quantity',
-                                                        options=[
-                                                            {'label': 'Single Chromosome',
-                                                                'value': 'single-chrom'},
-                                                            {'label': 'Whole Genome',
-                                                                'value': 'all-chroms'},
+                                                    # Graph type
+                                                    html.Div(
+                                                        id='graph-type-div',
+                                                        children=[
+                                                            html.H6(
+                                                                children=["Graph Type | "],
+                                                                style={'color': 'black', "padding-bottom": "2px"},
+                                                            ),
+                                                            dcc.Dropdown(
+                                                                id='graph-type-dropdown',
+                                                                options=[
+                                                                    {'label': 'Line', 'value': 'Line'},
+                                                                    {'label': 'Scatter', 'value': 'Scatter'},
+                                                                ],
+                                                                value='Line',
+                                                                className='dropdown-style',
+                                                                clearable=False,
+                                                            ),
                                                         ],
-                                                        value='single-chrom',
-                                                        className='dropdown-style',
+                                                        style={'padding': '5px', 'width': '10%'},
                                                     ),
-                                                ],
-                                                width=2
-                                            ),
-                                            # Chromosome Choice
-                                            dbc.Col(
-                                                className='col-divs',
-                                                children=[
+                                                    # Chromosome choice
                                                     html.Div(
                                                         id='chromosome-choice-div',
                                                         children=[
-                                                            # Drop down to show chromosome viewing choices
                                                             html.H6(
-                                                                children=['Chromosome:'],
-                                                                className='pdist-title',
+                                                                children=[view_toggle],
+                                                                style={'color': 'black', "padding-bottom": "2px"},
                                                             ),
                                                             dcc.Dropdown(
                                                                 id='pdist-chromosome-options',
                                                                 className='dropdown-style',
                                                             ),
                                                         ],
-                                                        # style={'display': 'none'}
+                                                        style={'padding': '5px'},
                                                     ),
-                                                ],
-                                                width=2
-                                            ),
-                                            # Graph Toggle Switches
-                                            dbc.Col(
-                                                children=[
+                                                    # Graph Switches
                                                     html.Div(
                                                         children=[
-                                                            html.H6("Graph Switches:", className="text-divs",),
+                                                            html.H6("Graph Switches | ", style={'color': 'black', "padding-bottom": "3px"}),
                                                             dbc.FormGroup(
                                                                 children=[
-                                                                    # dbc.Label("Additional Plots", className="text-divs-sm"),
                                                                     dbc.Checklist(
                                                                         id="pdist-alt-graph-switches",
                                                                         options=[
@@ -813,17 +774,13 @@ def signalTracer_layout():
                                                                         inline=True,
                                                                     ),
                                                                 ],
-                                                                className="formgroup",
                                                                 inline=True,
                                                             )
                                                         ],
-                                                        className="home-tab-button-cols",
+                                                        style={'padding': '5px'},
                                                     ),
                                                 ],
-                                                className="home-tab-divs-no-border",
-                                                width=2,
                                             ),
-                                            dbc.Col(html.Div(className='filler-div'),width=4.5),
                                         ],
                                         style={'background': 'orange', 'border-radius': '5px', 'margin-bottom': '10px'},
                                         no_gutters=True,
@@ -865,6 +822,7 @@ def signalTracer_layout():
                                                 filename="Graph_Name",
                                             ),  
                                         ),
+                                        style={"padding": "2px"}
                                     )
                                 ],
                             ),
@@ -887,7 +845,6 @@ def signalTracer_layout():
                 no_gutters=True
             ),
         ],
-        style={'height': '100vh'},
         fluid=True,
     )
     return layout
@@ -974,19 +931,20 @@ def main_graph_button_options(gffData, pdistData, chrom_choice):
  
 
 @app.callback(
-    [Output("chromosome-quantity", 'disabled'),
-     Output("pdist-chromosome-options", 'disabled'),],
+    [Output("pdist-chromosome-options", 'disabled'),
+     Output("view-option", "disabled"),
+    ],
     [Input("pdist-input-df", "children"),],
 )
-def disable_dropdowns(topo_data):
+def disable_components(topo_data):
     if not topo_data:
-        chromQuantity = True
         chromOptions = True
-        return chromQuantity, chromOptions
+        viewOption = True
+        return chromOptions, viewOption
     else:
-        chromQuantity = False
         chromOptions = False
-        return chromQuantity, chromOptions
+        viewOption = False
+        return chromOptions, viewOption
 
 # -----------------------------------------------------------------------------------
 ################################### File Upload #####################################
@@ -1091,7 +1049,6 @@ def load_input_files(btn1, btn2, btn3, btn4, fileContents, pdistFilename):
     elif button_id == "signal-submit-button":
         _, tvcontent_string = fileContents.split(',')
         tvDecoded = base64.b64decode(tvcontent_string)
-
         if '.csv' in pdistFilename:
             # Open csv file
             csv_df = pd.read_csv(io.StringIO(tvDecoded.decode('utf-8')))
@@ -1145,47 +1102,92 @@ def load_input_files(btn1, btn2, btn3, btn4, fileContents, pdistFilename):
         else:
             return dash.no_update, False, dash.no_update, False, False, [pdistFilename], "danger"
 
-
 # -----------------------------------------------------------------------------------
 ######################### Set option dropdown menu selections #######################
-@app.callback([Output('pdist-chromosome-options', 'options'),
-               Output('pdist-chromosome-options', 'value'),],
-              [Input('chromosome-quantity', 'value'),
-               Input('pdist-input-df', 'children'),
-               Input("pdist-new-session-modal", "is_open"),]
+@app.callback(
+    [Output('pdist-chromosome-options', 'options'),
+     Output('pdist-chromosome-options', 'value'),
+    ],
+    [Input('view-option', 'value'),
+     Input('pdist-input-df', 'children'),
+     Input("pdist-new-session-modal", "is_open"),
+    ]
 )
 def set_chromosome_choice(chrom_quantity, fileData, input_modal):
     if not fileData:
         raise PreventUpdate
     elif input_modal:
         raise PreventUpdate
-    elif chrom_quantity == 'all-chroms':
+    elif chrom_quantity:
         return [dict(label='Whole Genome View', value='Whole Genome View')], 'Whole Genome View'
     else:
         read_file = pd.read_json(fileData)
         options = [dict(label=chrom, value=chrom) for chrom in sorted(read_file['Chromosome'].unique())]
         return options, options[0]['value']
 
+
+@app.callback(
+    Output("color-palette", "data"),
+    [Input('pdist-input-df', 'children'),
+     Input("line-color-option", 'value'),
+     Input("color-palette", "data"),
+     Input("st-step-up-button", "n_clicks"),
+     Input("st-step-down-button", "n_clicks"),
+    ],
+)
+def set_line_colors(
+    data,
+    color_option,
+    curr_colors,
+    step_up_btn,
+    step_down_btn,
+):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        button_id = None
+    else:
+        button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+    if not data:
+        return dash.no_update
+    elif not curr_colors:
+        color_set = COLOR_SWATCHES[color_option]
+        return color_set
+    elif button_id == 'st-step-up-button':
+        step_color_set = curr_colors[1:] + [curr_colors[0]]
+        return step_color_set
+    elif button_id == 'st-step-down-button':
+        step_color_set = [curr_colors[-1]] + curr_colors[:-1]
+        return step_color_set
+    else:
+        color_set = COLOR_SWATCHES[color_option]
+        return color_set
+
+
 #----------------------------------------------------------------------------------------------------
 ### Graphing CB's ###
-@app.callback([Output('pdist-graph', 'figure'),
-               Output('pdist-graph', 'config'),],
-             [Input("pdist-new-session-modal", "is_open"),
-              Input('pdist-input-df', 'children'),
-              Input('pdist-chromosome-options', 'value'),
-              Input('template-option', 'value'),
-              Input("snapshot-file-option", "value"),
-              Input("line_width_options", "value"),
-              Input("line-color-option", 'value'),
-              Input("tv-pixel-height", "value"),
-              Input("tv-pixel-width", "value"),
-              Input("snapshot-scale", "value"),
-              Input("font_size_options", "value"),
-              Input("axis-gridlines", "value"),
-              Input("pdist-axis-line-width", "value"),
-              Input("editable-graph-option", "value"),
-            #   Input("facet_col_num", "value"),
-            ]
+@app.callback(
+    [Output('pdist-graph', 'figure'),
+     Output('pdist-graph', 'config'),
+     Output("marker_width_options", "value"),
+    ],
+    [Input("pdist-new-session-modal", "is_open"),
+     Input('pdist-input-df', 'children'),
+     Input('pdist-chromosome-options', 'value'),
+     Input('template-option', 'value'),
+     Input("snapshot-file-option", "value"),
+     Input("marker_width_options", "value"),
+     Input("color-palette", "data"),
+     Input("tv-pixel-height", "value"),
+     Input("tv-pixel-width", "value"),
+     Input("snapshot-scale", "value"),
+     Input("font_size_options", "value"),
+     Input("axis-gridlines", "value"),
+     Input("pdist-axis-line-width", "value"),
+     Input("editable-graph-option", "value"),
+     Input("view-option", "value"),
+     Input("graph-type-dropdown", "value"),
+     Input("st-font-family-option", "value"),
+    ]
 )
 def update_main_graph(
     input_modal,
@@ -1193,21 +1195,25 @@ def update_main_graph(
     chromosome, 
     template,
     snapshot_file_type,
-    line_width,
+    marker_width,
     line_color,
     pixel_height,
     pixel_width,
     snapshot_scale,
     font_size,
     axis_gridlines,
-    axis_line_width,
+    axis_marker_width,
     editable_graphs,
-    # facet_col_num,
+    view,
+    graph_type,
+    font_family,
 ):
     # Prevent update if True
     if not currData:
         raise PreventUpdate
     elif input_modal:
+        raise PreventUpdate
+    elif not line_color:
         raise PreventUpdate
     # Set editable value
     if not editable_graphs:
@@ -1216,7 +1222,6 @@ def update_main_graph(
         editable_graphs = True
     # Load in data and clean data
     df = pd.read_json(currData)
-    # df = df.melt(id_vars=["Chromosome", "Window"])
     df.columns = ["Chromosome", "Window", "Sample", "Value"]
     df = df.sort_values(by=["Chromosome", "Window"])
     # Get sample and chromosome data
@@ -1228,68 +1233,123 @@ def update_main_graph(
     y_max = float(df["Value"].max())
     x_max = df["Window"].max()
 
-    colors = COLOR_SWATCHES[line_color]
     # Add colors 
     try:
-        assert len(colors) > len(samples)
+        assert len(line_color) > len(samples)
+        colors = line_color
     except AssertionError:
-        colors = colors + colors[:(len(samples)-len(colors))]
+        colors = line_color + line_color[:(len(samples)-len(line_color))]
     # Set gridline bools
     xaxis_gridlines, yaxis_gridlines = tree_utils.get_gridline_bools(axis_gridlines)
 
-    if chromosome == "Whole Genome View":
-        fig = signal_utils.whole_genome(
-            df,
-            chromosomes,
-            samples,
-            colors,
-            line_width,
-            template,
-            font_size,
-            y_max,
-            x_max,
-            xaxis_gridlines,
-            yaxis_gridlines,
-        )
+    if view:
+        if graph_type == "Line":
+            fig = signal_utils.whole_genome_line(
+                df,
+                chromosomes,
+                samples,
+                colors,
+                marker_width,
+                template,
+                font_size,
+                y_max,
+                x_max,
+                xaxis_gridlines,
+                yaxis_gridlines,
+                font_family,
+            )
+        elif graph_type == "Scatter":
+            fig = signal_utils.whole_genome_scatter(
+                df,
+                chromosomes,
+                samples,
+                colors,
+                marker_width,
+                template,
+                font_size,
+                y_max,
+                x_max,
+                xaxis_gridlines,
+                yaxis_gridlines,
+                font_family,
+            )
         # Config pixel size
         if (not pixel_height) or (not pixel_width):
-            pixel_width, pixel_height = 1500, 1123
-        config = dict(
-            doubleClick="autosize",
-            displaylogo=False,
-            editable=editable_graphs,
-            edits=dict(
-                annotationText=True,
-                axisTitleText=False,
-                titleText=False,
-            ),
-            modeBarButtonsToRemove=[
-                "zoom2d",
-                "autoScale2d",
-                "resetScale2d",
-                "pan2d",
-                "lasso2d",
-                "select2d",
-            ],
-            toImageButtonOptions=dict(
-                format=snapshot_file_type,
-                filename="Graph_Name",
-                width=int(pixel_width),
-                height=int(pixel_height),
-            ),
-        )
-        return fig, config
+            config = dict(
+                doubleClick="autosize",
+                displaylogo=False,
+                editable=editable_graphs,
+                edits=dict(
+                    annotationText=True,
+                    axisTitleText=False,
+                    titleText=False,
+                ),
+                modeBarButtonsToRemove=[
+                    "zoom2d",
+                    "autoScale2d",
+                    "resetScale2d",
+                    "pan2d",
+                    "lasso2d",
+                    "select2d",
+                ],
+                toImageButtonOptions=dict(
+                    format=snapshot_file_type,
+                    filename="Graph_Name",
+                ),
+            )
+        else:
+            config = dict(
+                doubleClick="autosize",
+                displaylogo=False,
+                editable=editable_graphs,
+                edits=dict(
+                    annotationText=True,
+                    axisTitleText=False,
+                    titleText=False,
+                ),
+                modeBarButtonsToRemove=[
+                    "zoom2d",
+                    "autoScale2d",
+                    "resetScale2d",
+                    "pan2d",
+                    "lasso2d",
+                    "select2d",
+                ],
+                toImageButtonOptions=dict(
+                    format=snapshot_file_type,
+                    filename="Graph_Name",
+                    width=int(pixel_width),
+                    height=int(pixel_height),
+                ),
+            )
+        return fig, config, marker_width
     else:
-        fig = signal_utils.single_chromosome_graph(
-            df,
-            chromosome,
-            template,
-            line_width,
-            colors,
-            font_size,
-            xaxis_gridlines,
-            yaxis_gridlines,
-        )
+        if graph_type == "Line":
+            fig = signal_utils.single_chromosome_graph_line(
+                df,
+                chromosome,
+                template,
+                marker_width,
+                colors,
+                font_size,
+                xaxis_gridlines,
+                yaxis_gridlines,
+                font_family,
+                samples,
+            )
+        elif graph_type == "Scatter":
+            fig = signal_utils.single_chromosome_graph_scatter(
+                df,
+                chromosome,
+                template,
+                marker_width,
+                colors,
+                font_size,
+                xaxis_gridlines,
+                yaxis_gridlines,
+                font_family,
+                samples,
+            )
         # Config pixel size
         if (not pixel_height) or (not pixel_width):
             pixel_width, pixel_height = 750, 400
@@ -1303,8 +1363,6 @@ def update_main_graph(
                 titleText=False,
             ),
             modeBarButtonsToRemove=[
-                "zoomIn2d",
-                "zoomOut2d",
                 "zoom2d",
                 "autoScale2d",
                 "resetScale2d",
@@ -1319,7 +1377,7 @@ def update_main_graph(
                 height=int(pixel_height),
             ),
         )
-        return fig, config
+        return fig, config, marker_width
 
 
 @app.callback(
@@ -1336,7 +1394,6 @@ def update_main_graph(
     Input("pdist-axis-line-width", "value"),
     Input('pdist-graph', 'relayoutData'),
     Input("editable-graph-option", "value"),
-#   Input("facet_col_num", "value"),
     ]
 )
 def update_gff_graph(
@@ -1349,10 +1406,9 @@ def update_gff_graph(
     snapshot_file_type,
     line_color,
     axis_gridlines,
-    axis_line_width,
+    axis_marker_width,
     relayout_data,
     editable_graphs,
-    # facet_col_num,
 ):
     # Prevent update if True
     if not currData:
@@ -1445,9 +1501,10 @@ def update_gff_graph(
                 gff_df,
                 dataRange,
                 template,
-                axis_line_width,
+                axis_marker_width,
                 xaxis_gridlines,
                 yaxis_gridlines,
+                "Arial",
             )
             gff_graph = [
                 html.Div(
@@ -1492,7 +1549,7 @@ def update_gff_graph(
      State('pdist-graph', 'relayoutData'),],
     prevent_initial_call=True,
 )
-def current_window_summary(n, data_json, gff_json, chromosome, relayout_data):
+def current_window_summary(n, data_json, gff_json, current_chromosome, relayout_data):
     if not data_json:
         raise PreventUpdate
     ctx = dash.callback_context
@@ -1500,7 +1557,7 @@ def current_window_summary(n, data_json, gff_json, chromosome, relayout_data):
         button_id = None
     else:
         button_id = ctx.triggered[0]["prop_id"].split(".")[0]
-    if chromosome == "Whole Genome View":
+    if current_chromosome == "Whole Genome View":
         return None, None, True
     elif not button_id:
         raise PreventUpdate
@@ -1509,23 +1566,23 @@ def current_window_summary(n, data_json, gff_json, chromosome, relayout_data):
         relayout_keys = [k for k in relayout_data.keys()]
         if "xaxis.range" in relayout_keys[0]:
             dataMin, dataMax = [relayout_data['xaxis.range[0]'], relayout_data['xaxis.range[1]']]
-            df = df[(df["Window"] >= dataMin) & (df["Window"] <= dataMax) & (df["Chromosome"] == chromosome)]   
+            df = df[(df["Window"] >= dataMin) & (df["Window"] <= dataMax) & (df["Chromosome"] == current_chromosome)]   
         else:
-            df = df[df["Chromosome"] == chromosome]
+            df = df[df["Chromosome"] == current_chromosome]
         
         if not gff_json:
             gff_df = pd.DataFrame()
         else:
             gff_df = pd.read_json(gff_json)
-            gff_df = gff_df[(gff_df["start"] >= dataMin) & (gff_df["start"] <= dataMax) & (gff_df["chromosome"] == chromosome)]
+            gff_df = gff_df[(gff_df["start"] >= dataMin) & (gff_df["start"] <= dataMax) & (gff_df["chromosome"] == current_chromosome)]
         
         # Return according to available data
         if (len(df) == 0) and (len(gff_df) > 1):
-            return None, dcc.send_data_frame(gff_df.to_csv, "current_view_annotations.gff", sep="\t", index=False), False
+            return None, dcc.send_data_frame(gff_df.to_csv, f"current_view_{current_chromosome}_{int(dataMin)}_{int(dataMax)}.gff", sep="\t", index=False), False
         elif (len(df) > 1) and (len(gff_df) == 0):
-            return dcc.send_data_frame(df.to_excel, "current_view_data.xlsx", index=False), None, False
+            return dcc.send_data_frame(df.to_excel, f"current_view_{current_chromosome}_{int(dataMin)}_{int(dataMax)}.xlsx", index=False), None, False
         else:
-            return dcc.send_data_frame(df.to_excel, "current_view_data.xlsx", index=False), dcc.send_data_frame(gff_df.to_csv, "current_view_annotations.gff", sep="\t", index=False, header=False), False
+            return dcc.send_data_frame(df.to_excel, f"current_view_{current_chromosome}_{int(dataMin)}_{int(dataMax)}.xlsx", index=False), dcc.send_data_frame(gff_df.to_csv, f"current_view_{current_chromosome}_{int(dataMin)}_{int(dataMax)}.gff", sep="\t", index=False, header=False), False
     else:
         raise PreventUpdate
 

@@ -181,16 +181,21 @@ def get_gene_name(x):
             attr_tag = 'name='
             ftype = 'gff'
             pass
-        
         # Find available attribute tag - GTF
-        if 'gene_id' in x.lower():
+        elif 'gene_id' in x.lower():
             attr_tag = 'gene_id '
             ftype = 'gtf'
+        else:
+            ftype = None
+        # Set gene name
         if ftype == 'gff':
             gene_name = [x for x in x.split(";") if attr_tag in x.lower()][0][len(attr_tag):]
+            return gene_name
         elif ftype == 'gtf':
             gene_name = [x.split('"')[1] for x in x.split(";") if attr_tag in x.lower()][0]
-        return gene_name
+            return gene_name
+        else:
+            return "NoGeneName"
     except AttributeError:
         return 'NoGeneName'
 

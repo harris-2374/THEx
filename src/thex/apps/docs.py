@@ -86,7 +86,7 @@ docs_treeviewer_contents = html.Div(
             ),
             dcc.Markdown(
                 """
-                There are two required input files to run Tree Viewer: 1) Tree Viewer input file and 2) chromosome length BED file. 
+                There are two required input files to run Tree Viewer: 1. Tree Viewer input file and 2. chromosome length BED file. 
                 These two files provide the required information to visualize phylogenetic signal across the genome in proper scale 
                 to the chromosome length. Additional window-based data types can be added to the Tree Viewer input file providing, 
                 the ability to visualize a multitude of data types concurrently. These additional data types are added as a new column 
@@ -343,7 +343,7 @@ docs_treeviewer_contents = html.Div(
             #     className="tv-docs-content-text"
             # ),
             # html.Hr(style={"background-color": "black"}),
-        ], width={"size": 6, "offset": 3}, style={"background-color": "white"}),
+        ], width={"size": 8, "offset": 2}, style={"background-color": "white"}),
     ],
 )
 
@@ -491,7 +491,7 @@ docs_pdist_contents = html.Div(
             ),
             html.Br(),
             # html.Hr(style={"background-color": "black"}),
-        ], width={"size": 6, "offset": 3}, style={"background-color": "white"}),
+        ], width={"size": 8, "offset": 2}, style={"background-color": "white"}),
     ],
 )
 
@@ -788,7 +788,7 @@ docs_thexb_contents = html.Div(
                 className="tv-docs-content-text"
             ),
             html.Br(),
-        ], width={"size": 6, "offset": 3}, style={"background-color": "white"}),
+        ], width={"size": 8, "offset": 2}, style={"background-color": "white"}),
     ],
 )
 
@@ -829,18 +829,17 @@ layout = dbc.Container(
                 # Sidebar
                 dbc.Col(
                     children=[docs_sidebar],
-                    width='auto',
-                    style={"border": "orange solid 2px", "background-color": "#575151", 
-                            "border-radius": "5px", "margin": "5px 5px 5px 5px"},
+                    width=2,
+                    style={"border": "orange solid 2px", "background-color": "#575151", "border-radius": "5px"},
                 ),
                 # Content
                 dbc.Col(
                     children=[docs_content],
-                    style={"border": "orange solid 2px", 
-                            "border-radius": "5px", "margin": "5px 5px 5px 0px"},
+                    width=10,
+                    style={"border": "orange solid 2px", "border-radius": "5px"},
                 ),
             ],
-            style={"height": "92vh"}
+            style={"height": "92vh", "padding": "5px"}
         ),
     ],
     fluid=True,

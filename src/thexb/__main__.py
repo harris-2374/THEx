@@ -6,6 +6,7 @@ Author: Andrew Harris
 import argparse
 import configparser
 import logging
+import multiprocessing
 import os
 import shutil
 import sys
@@ -15,13 +16,12 @@ from thexb.UTIL_converters import convert_window_size_to_int
 from thexb.UTIL_parsers import break_alignment_to_chroms
 from thexb.UTIL_help_descriptions import HelpDesc
 # --- Toolkit pipeline stage imports ---
-from thexb.STAGE_fasta_windower import fasta_windower
+from thexb.STAGE_minifastas import fasta_windower
 from thexb.STAGE_iqtree import iq_tree
 from thexb.STAGE_iqtree_external import iq_tree_external
 from thexb.STAGE_pairwise_estimator import pairwise_estimator
 from thexb.STAGE_pairwise_filter import pairwise_filter
 from thexb.STAGE_pdistance_calculator import pdistance_calculator
-# from STAGE_percent_missing import percent_missing
 from thexb.STAGE_trimal import trimal
 from thexb.STAGE_topobinner import topobinner
 from thexb.STAGE_phybin import phybin
@@ -29,6 +29,7 @@ from thexb.STAGE_phybin import phybin
 from thexb.TOOL_parse_treeviewer_per_chromosome import parse_treeviewer_per_chromosome
 from thexb.TOOL_parsimony_informative_sites import parsimony_informative_sites
 from thexb.TOOL_root_TreeViewer_file import root_TreeViewer_file
+from thexb.TOOL_tree_viewer_input_stats import tv_input_stats
 # --- Toolkit Template imports ---
 from thexb.TEMPLATE_make_config import config_template
 
@@ -37,7 +38,7 @@ from thexb.TEMPLATE_make_config import config_template
 logger = logging.getLogger(__name__)
 def set_logger(WORKING_DIR, LOG_LEVEL):
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler(WORKING_DIR / 'logs/' / 'THEx_Toolkit.log')
+    file_handler = logging.FileHandler(WORKING_DIR / 'logs/' / 'THExBuilder.log')
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
     logger.addHandler(file_handler)
@@ -61,7 +62,12 @@ class InputNotProvided(Error):
 class InvalidInput(Error):
     """Raise when -i is provided and --tv_all is called"""
     pass
-
+class InvalidIQTREERoot(Error):
+    """Raise when IQ-TREE rooted input from -c is not Y or N"""
+    pass
+class InvalidMultiprocess(Error):
+    "Raise when Multiprocess input is not an integer"
+    pass
 ############################## Helper Functions ###############################
 def _check_log_level(l):
     valid_types = {'NOTSET': 0, 'DEBUG': 10, 'INFO': 20, 'WARNING': 30, 'ERROR': 40, 'CRITICAL': 50}
@@ -89,19 +95,17 @@ def main():
     """ This section of code handles all input data and calls methods. """
     """===================================================================="""
     # --- Argparse Setup ---
-    parser = argparse.ArgumentParser(description='THExBuilder (thexb)')
+    parser = argparse.ArgumentParser(prog="THExBuilder", description='Command line suite of pipelines and tools for Tree House Explorer')
     general = parser.add_argument_group('General Inputs')
     tv_pipeline = parser.add_argument_group('Tree Viewer Pipeline Stages')
     tv_pipeline_opts = parser.add_argument_group('TreeViewer Pipeline Arguments (no config file)')
     tv_additional_tools = parser.add_argument_group('TreeViewer Pipeline Additional Tools')
     pdist_pipeline = parser.add_argument_group('p-Distance Tracer Pipeline')
     sys_options = parser.add_argument_group('System Options')
-    toolkit = parser.add_argument_group('Misc. Tools')
     # General inputs (ignored when config file is provided)
     general.add_argument(
         '-i',
         '--input',
-        type=str,
         action="store",
         help=HelpDesc().input(),
         default=None,
@@ -177,12 +181,6 @@ def main():
         help=HelpDesc().trimal(),
         default=False,
     )
-    # tv_pipeline.add_argument(
-    #     '--percent_missing',
-    #     action="store_true",
-    #     help='Missing data filter',
-    #     default=False,
-    # )
     tv_pipeline.add_argument(
         '--pw_estimator',
         action="store_true",
@@ -364,18 +362,19 @@ def main():
     )
     tv_pipeline_opts.add_argument(
         '--iqtree_cpu_cores',
-        type=int,
+        type=str,
         action="store",
         help=HelpDesc().iqtree_cpu_cores(),
-        default=4,
+        default='AUTO',
         metavar='',
     )
     tv_pipeline_opts.add_argument(
         '--tb_rooted_trees',
-        type=bool,
+        type=str,
         action="store",
         help=HelpDesc().tb_rooted_trees(),
-        default=False,
+        default="N",
+        choices=["Y", "N"],
         metavar='',
     )
     tv_pipeline_opts.add_argument(
@@ -387,15 +386,6 @@ def main():
         metavar='',
     )
     # Dev Tools
-    
-    sys_options.add_argument(
-        '--update_freq',
-        type=int,
-        action='store',
-        help=HelpDesc().update_freq(),
-        default=10000,
-        metavar='',
-    )
     sys_options.add_argument(
         '--log_level',
         type=str,
@@ -418,7 +408,6 @@ def main():
     ALL_STEPS = args.tv_all
     MINIFASTAS = args.minifastas
     TRIMAL = args.trimal
-    # PERCENT_MISSING = args.percent_missing
     PW_ESTIMATOR = args.pw_estimator
     PW_FILTER = args.pw_filter
     IQTREE = args.iqtree
@@ -446,10 +435,9 @@ def main():
 
     IQTREE_MODEL = str(args.iqtree_model)
     IQTREE_BOOTSTRAP = int(args.iqtree_bootstrap)
-    IQTREE_CPU_NUM = int(args.iqtree_cpu_cores)
+    IQTREE_CPU_NUM = str(args.iqtree_cpu_cores)
 
-    TOPOBIN_ROOTED = bool(args.tb_rooted_trees)
-    
+    TOPOBIN_ROOTED = args.tb_rooted_trees
     # --- Tree Viewer Toolkit inputs ---
     PARSE_TREEVIEWER_FILE = args.parse_treeviewer
     PARSIMONY = args.parsimony_summary
@@ -462,7 +450,6 @@ def main():
 
     # --- Config + Logging ---
     CONFIG_FILE = args.config
-    UPDATE_FREQ = args.update_freq
     LOG_LEVEL = args.log_level
     MULTIPROCESS = args.cpu
 
@@ -477,7 +464,7 @@ def main():
     if not OUTPUT:
         WORKING_DIR = Path.cwd() / 'THExBuilderOutput'
     else:
-        WORKING_DIR = OUTPUT / 'THExBuilderOutput'
+        WORKING_DIR = Path(OUTPUT) / 'THExBuilderOutput'
     WORKING_DIR.mkdir(parents=True, exist_ok=True)
     # --- Set up logging ---
     log_dir = WORKING_DIR / "logs/"
@@ -486,7 +473,7 @@ def main():
     if CONFIG_TEMPLATE:
         config_template()
         exit()
-
+    # If no argument provided, print help message
     if len(sys.argv)==1:
         parser.print_help(sys.stderr)
         sys.exit(1)
@@ -507,6 +494,14 @@ def main():
         # General Input Variables
         INPUT = Path(config['Input Files']['multi_alignment_dir'])
         TREEVIEWER_FN = Path(config['Input Files']['TreeViewer_file_name'])
+        MULTIPROCESS = config['Processing']['multiprocess']
+        try:
+            if not MULTIPROCESS.isnumeric():
+                raise InvalidMultiprocess
+            else:
+                MULTIPROCESS = int(MULTIPROCESS)
+        except InvalidMultiprocess:
+            print("Invalid input for Multiprocess option. Value must an integer 1-n, where n is the total number of cores available")
 
         WINDOW_SIZE_STR = config['Fasta Windower']['window_size']
         WINDOW_SIZE_INT = convert_window_size_to_int(WINDOW_SIZE_STR)
@@ -515,18 +510,14 @@ def main():
         TRIMAL_THRESH = float(config['Trimal']['gap_threshold'])
         TRIMAL_MIN_LENGTH = convert_window_size_to_int(config['Trimal']['minimum_seq_length'])
 
-        # Percent Missing Input Variables
-        # PERCENT_MISSING_THRESH = float(config['Percent Missing']['threshold'])
-        # PERCENT_DROP_TYPE = config['Percent Missing']['drop_type']
-
         # Pairwise Filtering Input Variables
         PW_WINDOW_SIZE = convert_window_size_to_int(config['Pairwise Filter']['filter_window_size'])
         PW_STEP = convert_window_size_to_int(config['Pairwise Filter']['step'])
         PW_REF = config['Pairwise Filter']['reference_name']
         PW_MIN_SEQ_LEN = convert_window_size_to_int(config['Pairwise Filter']['min_seq_len'])
-        PW_PC_CUTOFF = float(config['Pairwise Filter']['min_pDistance_cutoff'])
+        PW_PDIST_CUTOFF = float(config['Pairwise Filter']['max_pDistance_cutoff'])
         PW_ZSCORE = float(config['Pairwise Filter']['Zscore'])
-        PW_PDIST_CUTOFF = float(config['Pairwise Filter']['pairwise_coverage_cutoff'])
+        PW_PC_CUTOFF = float(config['Pairwise Filter']['pairwise_coverage_cutoff'])
         PW_EXCLUDE_LIST = config['Pairwise Filter']['exclude_list']
         PW_MISSING_CHAR = config['Pairwise Filter']['missing_char']
 
@@ -536,10 +527,20 @@ def main():
         # IQ-TREE Input Variables
         IQT_MODEL = str(config['IQ-TREE']['model'])
         IQT_BOOTSTRAP = int(config['IQ-TREE']['bootstrap'])
-        IQT_CORES = int(config['IQ-TREE']['cores_per_job'])
+        IQT_CORES = str(config['IQ-TREE']['cores_per_job'])
 
-        # TopoBin Input Variables
-        TOPOBIN_ROOTED = bool(config['TOPOBIN']['rooted_trees'])
+        # TopoBin Input Variables - [Y/N]
+        TOPOBIN_ROOTED = str(config['Topobinner']['rooted_trees'])
+        try:
+            if TOPOBIN_ROOTED == "Y":
+                pass
+            elif TOPOBIN_ROOTED == "N":
+                pass
+            else:
+                raise InvalidIQTREERoot
+        except InvalidIQTREERoot:
+            print(f"ERROR: Topobinner 'rooted_trees' input can only be Y or N")
+            exit(1)
 
         # TreeViewer output file
         TREEVIEWER_FN = WORKING_DIR / 'TreeViewer_input.xlsx'
@@ -562,7 +563,9 @@ def main():
     elif INPUT:
         # General Input Variables
         try:
-            if ALL_STEPS:
+            if TOPOBIN:
+                pass
+            elif ALL_STEPS:
                 raise InvalidInput
             elif not INPUT:
                 raise InputNotFound
@@ -577,17 +580,12 @@ def main():
         except InvalidInput:
             print("ERROR: InvalidInput: (-i) argument is not a valid input when running --tv_all, use a configuration file (-c).")
             exit(1)
+        
         WINDOW_SIZE_STR = WINDOW_SIZE
         WINDOW_SIZE_INT = convert_window_size_to_int(WINDOW_SIZE_STR)
-
         # Trimal
         TRIMAL_THRESH = TRIMAL_GAP_THRESH
         TRIMAL_MIN_LENGTH = convert_window_size_to_int(TRIMAL_MIN_SEQ_LEN)
-
-        # Percent Missing Input Variables
-        # PERCENT_MISSING_THRESH = float(config['Percent Missing']['threshold'])
-        # PERCENT_DROP_TYPE = config['Percent Missing']['drop_type']
-
         # Pairwise Filtering Input Variables
         PW_WINDOW_SIZE = PW_WINDOW_SIZE
         PW_STEP = PW_STEP
@@ -598,21 +596,19 @@ def main():
         PW_PDIST_CUTOFF = PW_PDIST_CUTOFF
         PW_EXCLUDE_LIST = REFERENCE
         PW_MISSING_CHAR = PW_MISSING_CHAR
-
         # Pairwise Estimator Input Variables
         PW_EST_PERCENT_CHROM = PW_ESTIMATOR_PERCENT_CHROM
-
         # IQ-TREE Input Variables
         IQT_MODEL = IQTREE_MODEL
         IQT_BOOTSTRAP = IQTREE_BOOTSTRAP
         IQT_CORES = IQTREE_CPU_NUM
-
-        # TopoBin Input Variables
-        TOPOBIN_ROOTED = TOPOBIN_ROOTED
-
+        # TopoBin Input Variable set above
         # TreeViewer output file
         TREEVIEWER_FN = Path(args.tv_file_name)
 
+        logger = set_logger(WORKING_DIR, LOG_LEVEL)
+    elif TOPOBIN:
+        TREEVIEWER_FN = Path(args.tv_file_name)
         logger = set_logger(WORKING_DIR, LOG_LEVEL)
     else:
         try:
@@ -652,9 +648,9 @@ def main():
             print("ERROR: No reference (-r, --reference) sample provided")
             exit()
         # Log init + run
-        logger.info("======================================= ")
+        logger.info("#######################################")
         logger.info("======== p-Distance Calculator ======== ")
-        logger.info("======================================= ")
+        logger.info("#######################################")
         logger.info("----------Input Parameters----------")
         logger.info("------------------------------------")
         logger.info(f"Input directory: {INPUT.as_posix()}")
@@ -697,36 +693,32 @@ def main():
 
     # --- Tree Viewer Pipeline ---
     if ALL_STEPS:
-        logger.info("======================================= ")
+        logger.info("")
+        logger.info("#######################################")
         logger.info("============ Full Pipeline ============ ")
-        logger.info("======================================= ")
+        logger.info("#######################################")
         try:
             if not CONFIG_FILE:
                 raise ConfigNotFound
-            if INPUT:
-                raise InvalidInput
+
         except ConfigNotFound:
             print("ERROR: FileNotFound: A configuration file was not provided. A configuration file must be provided when running the full pipeline.")
-        except InvalidInput:
-            print("ERROR: InvalidInput: (-i) argument is not a valid input when running --tv_all, use a configuration file (-c).")
         MINIFASTAS = True
         TRIMAL = True
-        PERCENT_MISSING = True
         PW_FILTER = True
         IQTREE = True
         TOPOBIN = True
-        print("HELLO")
         pass
     
     if MINIFASTAS:
         # Input/output
         outdir = WORKING_DIR / "windowed_fastas"
         # Log input parameters
-        logger.info("======================================= ")
+        logger.info("")
+        logger.info("#######################################")
         logger.info("======= Fasta Windowing Parser ======== ")
-        logger.info("======================================= ")
+        logger.info("#######################################")
         logger.info("----------Input Parameters----------")
-        logger.info("------------------------------------")
         logger.info(f"Input directory: {INPUT.as_posix()}")
         logger.info(f"Output directory: {outdir.as_posix()}")
         logger.info(f"Window size: {WINDOW_SIZE_STR}")
@@ -739,37 +731,27 @@ def main():
         windowed_fasta_dir = WORKING_DIR / 'windowed_fastas'
         filtered_outdir = WORKING_DIR / 'trimal_filtered_windows'
         # Log + run
-        logger.info("======================================= ")
+        logger.info("")
+        logger.info("#######################################")
         logger.info("=============== Trimal ================ ")
-        logger.info("======================================= ")
+        logger.info("#######################################")
         logger.info("----------Input Parameters----------")
-        logger.info("------------------------------------")
         logger.info(f"Input directory: {windowed_fasta_dir.as_posix()}")
         logger.info(f"Gap threshold: {TRIMAL_THRESH}")
         logger.info(f"Minimum post-trimal sequence length: {TRIMAL_MIN_LENGTH}")
         logger.info("------------------------------------")
-        trimal(windowed_fasta_dir, filtered_outdir, WORKING_DIR, TRIMAL_THRESH, TRIMAL_MIN_LENGTH, MULTIPROCESS, LOG_LEVEL, UPDATE_FREQ)
+        trimal(windowed_fasta_dir, filtered_outdir, WORKING_DIR, TRIMAL_THRESH, TRIMAL_MIN_LENGTH, MULTIPROCESS, LOG_LEVEL)
         pass
-
-    ## REMOVED -- NOT USED
-    # if PERCENT_MISSING:
-    #     logger.info("======================================= ")
-    #     logger.info("========= Missing Data Filter ========= ")
-    #     logger.info("======================================= ")
-    #     filtered_indir = WORKING_DIR / 'trimal_filtered_windows'
-    #     filtered_outdir = WORKING_DIR / 'percent_missing_filtered_windowed_chroms'
-    #     # Run % missing filter
-    #     percent_missing(filtered_indir, filtered_outdir, WORKING_DIR, PERCENT_MISSING_THRESH, PERCENT_DROP_TYPE, MULTIPROCESS, LOG_LEVEL, UPDATE_FREQ)
 
     if PW_ESTIMATOR:
         # Input/output
         filtered_indir = WORKING_DIR / 'trimal_filtered_windows'
         # Log input parameters
-        logger.info("======================================= ")
+        logger.info("")
+        logger.info("#######################################")
         logger.info("========== Pairwise Estimator ========= ")
-        logger.info("======================================= ")
+        logger.info("#######################################")
         logger.info("----------Input Parameters----------")
-        logger.info("------------------------------------")
         logger.info(f"Input directory: {filtered_indir.as_posix()}")
         logger.info(f"Reference sample: {PW_REF}")
         logger.info(f"Percentage of chromosome sampled: {PW_EST_PERCENT_CHROM}")
@@ -787,11 +769,11 @@ def main():
         filtered_indir = WORKING_DIR / 'trimal_filtered_windows'
         filtered_outdir = WORKING_DIR / 'pairwise_filtered_windows'
         # Log input parameters
-        logger.info("======================================= ")
+        logger.info("")
+        logger.info("#######################################")
         logger.info("=========== Pairwise Filter =========== ")
-        logger.info("======================================= ")
+        logger.info("#######################################")
         logger.info("----------Input Parameters----------")
-        logger.info("------------------------------------")
         logger.info(f"Input Directory: {filtered_indir}")
         logger.info(f"Output Directory: {filtered_outdir}")
         logger.info(f"Window Size: {PW_WINDOW_SIZE}")
@@ -808,7 +790,6 @@ def main():
             filtered_indir,
             filtered_outdir,
             WORKING_DIR,
-            UPDATE_FREQ,
             PW_WINDOW_SIZE,
             PW_STEP,
             PW_PDIST_CUTOFF,
@@ -826,22 +807,22 @@ def main():
     if IQTREE:
         # Input/output
         filtered_indir = WORKING_DIR / 'pairwise_filtered_windows'
-        filtered_metadata_outdir = WORKING_DIR / 'IQ_TREE_metadata'
-        filtered_tree_outdir = WORKING_DIR / 'IQ_TREE_trees'
+        filtered_metadata_outdir = WORKING_DIR / 'IQ-TREE_metadata'
+        filtered_tree_outdir = WORKING_DIR / 'IQ-TREE_trees'
         # Erase old output directories if present and create new directories
         try:
-            filtered_metadata_outdir.mkdir(parents=True, exist_ok=False)
-            filtered_tree_outdir.mkdir(parents=True, exist_ok=False)
+            filtered_metadata_outdir.mkdir(parents=True)
+            filtered_tree_outdir.mkdir(parents=True)
         except FileExistsError:
             shutil.rmtree(filtered_metadata_outdir)
             shutil.rmtree(filtered_tree_outdir)
-            filtered_metadata_outdir.mkdir(parents=True, exist_ok=False)
-            filtered_tree_outdir.mkdir(parents=True, exist_ok=False)
-        logger.info("======================================= ")
+            filtered_metadata_outdir.mkdir(parents=True)
+            filtered_tree_outdir.mkdir(parents=True)
+        logger.info("")
+        logger.info("#######################################")
         logger.info("=============== IQ-TREE =============== ")
-        logger.info("======================================= ")
+        logger.info("#######################################")
         logger.info("----------Input Parameters----------")
-        logger.info("------------------------------------")
         logger.info(f"Input directory: {filtered_indir.as_posix()}")
         logger.info(f"IQ-Tree metadata output directory: {filtered_metadata_outdir.as_posix()}")
         logger.info(f"IQ-Tree Newick tree output directory: {filtered_tree_outdir.as_posix()}")
@@ -876,11 +857,11 @@ def main():
         except InputNotFound:
             print("ERROR: FileNotFound: Pathway provided to (-i) could not be found or is not provided. Please check input pathway and try again.")
             exit(1)
-        logger.info("================================================ ")
+        logger.info("")
+        logger.info("#######################################")
         logger.info("=============== IQ-TREE External =============== ")
-        logger.info("================================================ ")
+        logger.info("#######################################")
         logger.info("----------Input Parameters----------")
-        logger.info("------------------------------------")
         logger.info(f"External input directory: {INPUT.as_posix()}")
         logger.info(f"Tree Viewer file: {TREEVIEWER_FN}")
         logger.info("------------------------------------")
@@ -895,11 +876,11 @@ def main():
     if TOPOBIN: 
         # Input/Output
         UPDATED_TV_FILENAME = TREEVIEWER_FN.parents[0] / f"{TREEVIEWER_FN.stem}_topobinner_output.xlsx"
-        logger.info("======================================= ")
+        logger.info("")
+        logger.info("#######################################")
         logger.info("========== Topology Binning =========== ")
-        logger.info("======================================= ")
+        logger.info("#######################################")
         logger.info("----------Input Parameters----------")
-        logger.info("------------------------------------")
         logger.info(f"Tree Viewer file: {TREEVIEWER_FN}")
         logger.info(f"Topobinned output file: {UPDATED_TV_FILENAME}")
         logger.info(f"Trees rooted?: {TOPOBIN_ROOTED}")
@@ -925,9 +906,10 @@ def main():
         except InputNotFound:
             print("ERROR: FileNotFound: Pathway provided to (-i) could not be found or is not provided. Please check input pathway and try again.")
             exit(1)
-        logger.info("========================================== ")
+        logger.info("")
+        logger.info("#######################################")
         logger.info("============ PhyBin External ============= ")
-        logger.info("========================================== ")
+        logger.info("#######################################")
         phybin(
             INPUT,
             TREEVIEWER_FN,
@@ -955,7 +937,6 @@ def main():
             INPUT,
             WORKING_DIR,
         )
-
 
     return
 

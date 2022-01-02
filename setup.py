@@ -9,10 +9,10 @@ if sys.version_info[:2] < (3, 7):
 
 setup(
     name="thex",
-    version="1.0.0_Beta",
+    version="1.0.0",
     author="Andrew Harris",
     author_email="ajharris.2374@gmail.com",
-    url="https://github.com/harris-2374/TreeHouseExplorer",
+    url="https://github.com/harris-2374/THEx",
     license="MIT",
     classifiers=[
         "Development Status :: 4 - Beta",

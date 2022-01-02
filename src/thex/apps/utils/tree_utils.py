@@ -5,20 +5,23 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import scipy.stats as ss
+import scikit_posthocs as sp
+from dash_table.Format import Format, Scheme
 from Bio import Phylo
 from ete3 import Tree
 from plotly.subplots import make_subplots
 
-from thex.apps.utils import data_utils
-
 # -------------------------------------------------------------------------------------
 # --------------------------------------- Classes -------------------------------------
 class DrawTree():
-    def __init__(self, newicktree, template, topology, color_map):
+    def __init__(self, newicktree, template, topology, color_map, branch_len, font_family):
         self.newicktree = Phylo.read(newicktree, "newick")
         self.template = template
         self.topology = topology
         self.color_map = color_map
+        self.branch_len = branch_len
+        self.font_family = font_family
 
     def create_square_tree(self):
 
@@ -26,11 +29,10 @@ class DrawTree():
             """Associates to each clade an x-coord.
             returns dict {clade: x-coord}
             """
-            xcoords = tree.depths(unit_branch_lengths=True)
-            # xcoords = tree.depths(unit_branch_lengths=False)
-
-            # first_node = [k for k in xcoords][0]
-            # xcoords[first_node] = -0.01
+            if self.branch_len:
+                xcoords = tree.depths(unit_branch_lengths=True)
+            else:
+                xcoords = tree.depths()
 
             # tree.depth() maps tree clades to depths (by branch length).
             # returns a dict {clade: depth} where clade runs over all Clade instances of the tree, and depth is the distance from root to clade
@@ -40,7 +42,7 @@ class DrawTree():
                 xcoords = tree.depths(unit_branch_lengths=True)
             return xcoords
 
-        def get_y_coordinates(tree, dist=1):
+        def get_y_coordinates(tree, dist=1.3):
             """
             returns  dict {clade: y-coord}
             The y-coordinates are  (float) multiple of integers (i*dist below)
@@ -56,8 +58,8 @@ class DrawTree():
                 for subclade in clade:
                     if subclade not in ycoords:
                         calc_row(subclade)
-                ycoords[clade] = (ycoords[clade.clades[0]] +
-                                  ycoords[clade.clades[-1]]) / 2
+                # This is intermediate placement of internal nodes
+                ycoords[clade] = (ycoords[clade.clades[0]] + ycoords[clade.clades[-1]]) / 2
 
             if tree.root.clades:
                 calc_row(tree.root)
@@ -152,7 +154,6 @@ class DrawTree():
                                x_coords=x_coords, y_coords=y_coords, 
                                line_color=line_color)
 
-
         if 'dark' in self.template:
             text_color = 'white'
         else:
@@ -164,7 +165,7 @@ class DrawTree():
         x_coords = get_x_coordinates(tree)
         y_coords = get_y_coordinates(tree)
         line_shapes = []
-        
+
         draw_clade(
             tree.root,
             0,
@@ -213,34 +214,37 @@ class DrawTree():
                 marker=dict(color=text_color, size=5),
                 text=text,  # vignet information of each node
                 textposition='middle right',
-                textfont=dict(color=text_color, size=15),
+                textfont=dict(color=text_color, size=12),
                 showlegend=False,
                 name=elt,
             )
             nodes.append(node)
         # Set graph x-range
-        if max(x_coords.values()) < 0.1:
-            x_range = [-0.1, (max(x_coords.values())+(max(x_coords.values())*1.25))]
+        if self.branch_len:
+            x_range = [-0.5, (max(x_coords.values())+2)]
+            show_xaxis = False
+        elif max(x_coords.values()) < 0.1:
+            x_range = [0, (max(x_coords.values())+(max(x_coords.values())*1.25))]
             show_xaxis = True
         elif max(x_coords.values()) < 0.5:
-            x_range = [-0.1, 0.5]
+            x_range = [0, 0.5]
             show_xaxis = True
         elif max(x_coords.values()) < 1:
-            x_range = [-0.1, 1]
+            x_range = [0, 1]
             show_xaxis = True
         elif max(x_coords.values()) == 1:
-            x_range = [-0.1, max(x_coords.values())+2]
+            x_range = [0, max(x_coords.values())+2]
             show_xaxis = False
         else:
-            x_range = [-0.1, max(x_coords.values())+2]
+            x_range = [0, max(x_coords.values())+2]
             show_xaxis = False
 
         layout = dict(
             autosize=True,
+            showlegend=False,
             template=self.template,
             dragmode="pan",
             margin=dict(t=20, b=10, r=20, l=10),
-            showlegend=False,
             xaxis=dict(
                 showline=True,
                 zeroline=False,
@@ -252,6 +256,7 @@ class DrawTree():
             yaxis=axis,
             hovermode="closest",
             shapes=line_shapes,
+            font=dict(family=self.font_family,size=14),
         )
 
         fig = go.Figure(data=nodes, layout=layout)
@@ -307,9 +312,6 @@ class DrawTree():
                 (leaf, i) for leaf, i in zip(internal_nodes, reversed(range(1, len(internal_nodes))))
             )
             ycoords = {**terminal_ycoords, **internal_ycoords}
-            # print("***********************")
-            # print(ycoords)
-            # print("***********************")
 
             def calc_row(clade):
                 for subclade in clade:
@@ -385,7 +387,7 @@ class DrawTree():
                 # Draw descendants
                 for child in clade:
                     draw_clade(child, x_curr, line_shapes, x_coords=x_coords,
-                               y_coords=y_coords, last_clade_y_coord=y_coords[clade], 
+                               y_coords=y_coords, last_clade_y_coord=y_coords[clade],
                                init_flag=False, line_color=line_color)
         if 'dark' in self.template:
             text_color = 'white'
@@ -400,8 +402,7 @@ class DrawTree():
         # dict(keys=clade_names, values=)
         x_coords = get_x_coordinates(tree)
         y_coords = get_y_coordinates(tree)
-        # y_coords = get_x_coordinates(tree)
-        # x_coords = get_y_coordinates(tree)
+
         line_shapes = []
 
         draw_clade(
@@ -465,7 +466,7 @@ class DrawTree():
                 visible=False,
                 showgrid=False,
                 showticklabels=True,
-                range=[-1, (max(x_coords.values())+2)]
+                range=[0, (max(x_coords.values())+2)]
             ),
             yaxis=axis,
             hovermode="closest",
@@ -477,6 +478,239 @@ class DrawTree():
         fig = dict(data=nodes, layout=layout)
         return fig
 
+    
+    def create_circular_tree(self):
+        def get_circular_tree_data(tree, order='level', dist=1, start_angle=0, end_angle=360, start_leaf='first'):
+            """Define  data needed to get the Plotly plot of a circular tree
+               Source code found at: https://chart-studio.plotly.com/~empet/14834.embed
+            """
+            # tree:  an instance of Bio.Phylo.Newick.Tree or Bio.Phylo.PhyloXML.Phylogeny
+            # order: tree  traversal method to associate polar coordinates to its nodes
+            # dist:  the vertical distance between two consecutive leafs in the associated rectangular tree layout
+            # start_angle:  angle in degrees representing the angle of the first leaf mapped to a circle
+            # end_angle: angle in degrees representing the angle of the last leaf
+            # the list of leafs mapped in anticlockwise direction onto circles can be tree.get_terminals() 
+            # or its reversed version tree.get_terminals()[::-1]. 
+            # start leaf: is a keyword with two possible values"
+            # 'first': to map  the leafs in the list tree.get_terminals() onto a circle,
+            #         in the counter-clockwise direction
+            # 'last': to map  the leafs in the  list, tree.get_terminals()[::-1] 
+            
+            start_angle *= np.pi/180 # conversion to radians
+            end_angle *= np.pi/180
+            
+            def get_radius(tree):
+                """
+                Associates to  each clade root its radius, equal to the distance from that clade to the tree root
+                returns dict {clade: node_radius}
+                """
+                if self.branch_len:
+                    node_radius = tree.depths(unit_branch_lengths=True)
+                else:
+                    node_radius = tree.depths()
+                
+                #  If the tree did not record  the branch lengths  assign  the unit branch length
+                #  (ex: the case of a newick tree "(A, (B, C), (D, E))")
+                if not np.count_nonzero(node_radius.values()):
+                    node_radius = tree.depths(unit_branch_lengths=True)
+                return node_radius
+        
+            
+            def get_vertical_position(tree):
+                """
+                returns a dict {clade: ycoord}, where y-coord is the cartesian y-coordinate 
+                of a  clade root in a rectangular phylogram
+                
+                """
+                n_leafs = tree.count_terminals() # Counts the number of tree leafs.
+                
+                # Assign y-coordinates to the tree leafs
+                if start_leaf == 'first':
+                    node_ycoord = dict((leaf, k) for k, leaf in enumerate(tree.get_terminals()))
+                elif start_leaf == 'last':
+                    node_ycoord = dict((leaf, k) for k, leaf in enumerate(reversed(tree.get_terminals())))
+                else:
+                    raise ValueError("start leaf can be only 'first' or 'last'")
+                    
+                def assign_ycoord(clade):#compute the y-coord for the root of this clade
+                    for subclade in clade:
+                        if subclade not in node_ycoord: # if the subclade root hasn't a y-coord yet
+                            assign_ycoord(subclade)
+                    node_ycoord[clade] = 0.5 * (node_ycoord[clade.clades[0]] + node_ycoord[clade.clades[-1]])
+
+                if tree.root.clades:
+                    assign_ycoord(tree.root)
+                return node_ycoord
+
+            node_radius = get_radius(tree)
+            node_ycoord = get_vertical_position(tree)
+            y_vals = node_ycoord.values()
+            ymin, ymax = min(y_vals), max(y_vals)
+            ymin -= dist # this dist subtraction is necessary to avoid coincidence of the  first and last leaf angle
+                        # when the interval  [ymin, ymax] is mapped onto [0, 2pi],
+                        
+            def ycoord2theta(y):
+                # maps an y in the interval [ymin-dist, ymax] to the interval [radian(start_angle), radian(end_angle)]
+                
+                return start_angle + (end_angle - start_angle) * (y-ymin) / float(ymax-ymin)
+
+
+            def get_points_on_lines(linetype='radial', x_left=0, x_right=0, y_right=0,  y_bot=0, y_top=0):
+                """
+                - define the points that generate a radial branch and the circular arcs, perpendicular to that branch
+                
+                - a circular arc (angular linetype) is defined by 10 points on the segment of ends
+                (x_bot, y_bot), (x_top, y_top) in the rectangular layout,
+                mapped by the polar transformation into 10 points that are spline interpolated
+                - returns for each linetype the lists X, Y, containing the x-coords, resp y-coords of the
+                line representative points
+                """
+            
+                if linetype == 'radial':
+                    theta = ycoord2theta(y_right) 
+                    X = [x_left*np.cos(theta), x_right*np.cos(theta), None]
+                    Y = [x_left*np.sin(theta), x_right*np.sin(theta), None]
+                
+                elif linetype == 'angular':
+                    theta_b = ycoord2theta(y_bot)
+                    theta_t = ycoord2theta(y_top)
+                    t = np.linspace(0,1, 10)# 10 points that span the circular arc 
+                    theta = (1-t) * theta_b + t * theta_t
+                    X = list(x_right * np.cos(theta)) + [None]
+                    Y = list(x_right * np.sin(theta)) + [None]
+                
+                else:
+                    raise ValueError("linetype can be only 'radial' or 'angular'")
+            
+                return X,Y   
+                
+
+            def get_line_lists(clade,  x_left,  xlines, ylines, xarc, yarc):
+                """Recursively compute the lists of points that span the tree branches"""
+                
+                # xlines, ylines  - the lists of x-coords, resp y-coords of radial edge ends
+                # xarc, yarc - the lists of points generating arc segments for tree branches
+                
+                x_right = node_radius[clade]
+                y_right = node_ycoord[clade]
+        
+                X,Y = get_points_on_lines(linetype='radial', x_left=x_left, x_right=x_right, y_right=y_right)
+        
+                xlines.extend(X)
+                ylines.extend(Y)
+        
+                if clade.clades:
+                
+                    y_top = node_ycoord[clade.clades[0]]
+                    y_bot = node_ycoord[clade.clades[-1]]
+            
+                    X,Y = get_points_on_lines(linetype='angular',  x_right=x_right, y_bot=y_bot, y_top=y_top)
+                    xarc.extend(X)
+                    yarc.extend(Y)
+            
+                    # get and append the lists of points representing the  branches of the descedants
+                    for child in clade:
+                        get_line_lists(child, x_right, xlines, ylines, xarc, yarc)
+
+            xlines = []
+            ylines = []
+            xarc = []
+            yarc = []
+            get_line_lists(tree.root,  0, xlines, ylines, xarc, yarc)  
+            xnodes = []
+            ynodes = []
+
+            for clade in tree.find_clades(order='preorder'): #it was 'level'
+                theta = ycoord2theta(node_ycoord[clade])
+                xnodes.append(node_radius[clade]*np.cos(theta))
+                ynodes.append(node_radius[clade]*np.sin(theta))
+                
+            return xnodes, ynodes,  xlines, ylines, xarc, yarc
+
+        if 'dark' in self.template:
+            text_color = 'white'
+        else:
+            text_color = 'black'
+        line_color = self.color_map[self.topology]
+        
+        tree = self.newicktree
+        tree.ladderize()
+
+        traverse_order = 'preorder'
+
+        all_clades=list(tree.find_clades(order=traverse_order))
+        for k in range(len((all_clades))):
+            all_clades[k].id=k
+
+        xnodes, ynodes,  xlines, ylines, xarc, yarc = get_circular_tree_data(tree, order=traverse_order, start_leaf='last')
+
+        tooltip=[]
+        clade_names=[]
+        color=[]
+        
+        for clade in tree.find_clades(order=traverse_order):
+            if self.branch_len:
+                branch_length = 1
+            else:
+                branch_length = clade.branch_length
+            if clade.name and clade.confidence and clade.branch_length:
+                tooltip.append(f"name: {clade.name}<br>branch-length: {branch_length}\
+                            <br>confidence: {int(clade.confidence)}")
+                color.append[clade.confidence.value]
+                clade_names.append(clade.name)
+            elif clade.name is None and clade.branch_length is not None and clade.confidence is not None: 
+                color.append(clade.confidence)
+                clade_names.append(clade.name)
+                tooltip.append(f"branch-length: {branch_length}\
+                            <br>confidence: {int(clade.confidence)}")
+            elif clade.name and clade.branch_length and clade.confidence is None:
+                tooltip.append(f"name: {clade.name}<br>branch-length: {branch_length}")
+                color.append(-1)
+                clade_names.append(clade.name)
+            else: 
+                tooltip.append('')
+                color.append(-1)
+                clade_names.append(clade.name)
+
+        trace_nodes=dict(type='scatter',
+            x=xnodes,
+            y= ynodes, 
+            mode='markers+text',
+            marker=dict(color=text_color, size=8),
+            text=clade_names,
+            textposition='top center',
+            textfont=dict(color=text_color, size=12),
+            hoverinfo='text',
+            hovertemplate=tooltip,
+        )
+
+        trace_radial_lines=dict(type='scatter',
+            x=xlines,
+            y=ylines, 
+            mode='lines',
+            line=dict(color=line_color, width=1),
+            hoverinfo='none',
+        )
+
+        trace_arcs=dict(type='scatter',
+            x=xarc,
+            y=yarc,
+            mode='lines',
+            line=dict(color=line_color, width=1, shape='spline'),
+            hoverinfo='none',
+        )
+        layout=dict(
+            font=dict(family=self.font_family,size=14),
+            autosize=True,
+            showlegend=False,
+            template=self.template,
+            xaxis=dict(visible=False),
+            yaxis=dict(visible=False), 
+            hovermode='closest',
+            margin=dict(t=20, b=10, r=20, l=10, pad=20),
+        )
+        fig = go.Figure(data=[trace_radial_lines, trace_arcs, trace_nodes], layout=layout)
+        return fig
 
 class RFDistance():
 
@@ -509,52 +743,99 @@ def make_alt_data_str_figure(
     axis_line_width,
     xaxis_gridlines,
     yaxis_gridlines,
+    font_family,
+    whole_genome,
 ):
     # sort dataframe
     topology_df.sort_values(by=["Window"], inplace=True)
     topology_df.fillna("NULL", inplace=True)
 
     # Build graph
-    fig = px.histogram(
-        topology_df,
-        x="Window",
-        y=[1]*len(topology_df),
-        color=alt_data_to_graph,
-        color_discrete_sequence=list(color_mapping.values()),
-        nbins=int(chromosome_df["End"].max()/window_size),
-    )
-    # Update layout
-    fig.update_layout(
-        template=template,
-        margin=dict(
-            l=60,
-            r=50,
-            b=40,
-            t=40,
-        ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="left",
-            x=0
-        ),
-        title={
-            'text': str(alt_data_to_graph),
-            'y':0.95,
-            'x':0.501,
-            'xanchor': 'center',
-            'yanchor': 'top'
-        },
-        hovermode="x unified",
-    )
-    fig.update_xaxes(
-        title="Position",
-        range=dataRange,
-        showline=True,
-        showgrid=xaxis_gridlines,
-        linewidth=axis_line_width,
-    )
+    if whole_genome:
+        fig = px.histogram(
+            topology_df,
+            x="Window",
+            y=[1]*len(topology_df),
+            color=alt_data_to_graph,
+            color_discrete_sequence=list(color_mapping.values()),
+            nbins=int(chromosome_df["End"].max()/window_size),
+            facet_row="Chromosome",
+        )
+        fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+        fig.update_layout(
+            template=template,
+            margin=dict(
+                l=60,
+                r=50,
+                b=40,
+                t=40,
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0
+            ),
+            title={
+                'text': str(alt_data_to_graph),
+                'x':0.5,
+                'xanchor': 'center',
+                'yanchor': 'top',
+            },
+            hovermode="x unified",
+            font=dict(family=font_family,),
+            height=100*len(topology_df["Chromosome"].unique())
+        )
+    else:
+        fig = px.histogram(
+            topology_df,
+            x="Window",
+            y=[1]*len(topology_df),
+            color=alt_data_to_graph,
+            color_discrete_sequence=list(color_mapping.values()),
+            nbins=int(chromosome_df["End"].max()/window_size),
+        )
+        fig.update_layout(
+            template=template,
+            margin=dict(
+                l=60,
+                r=50,
+                b=40,
+                t=40,
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0
+            ),
+            title={
+                'text': str(alt_data_to_graph),
+                'x':0.5,
+                'xanchor': 'center',
+                'yanchor': 'top',
+            },
+            hovermode="x unified",
+            font=dict(family=font_family,),
+        )
+    
+    if dataRange:
+        fig.update_xaxes(
+            title="Position",
+            range=dataRange,
+            showline=True,
+            showgrid=xaxis_gridlines,
+            linewidth=axis_line_width,
+        )
+    else:
+        fig.update_xaxes(
+            title="Position",
+            showline=True,
+            showgrid=xaxis_gridlines,
+            linewidth=axis_line_width,
+        )
     fig.update_yaxes(
         title="y-axis",
         range=[0, 1],
@@ -576,55 +857,107 @@ def make_alt_data_int_figure(
     axis_line_width,
     xaxis_gridlines,
     yaxis_gridlines,
+    font_family,
+    whole_genome,
 ):
     # sort dataframe
     topology_df = topology_df.sort_values(by=["Window"])
     y_range = [0, (y_max*1.1)]
     # Build graph
-    fig = px.line(
-        topology_df,
-        x="Window",
-        y=alt_data_to_graph,
-        color_discrete_sequence=list(color_mapping.values()),
-    )
-    # Update layout
-    fig.update_layout(
-        template=template,
-        margin=dict(
-            l=60,
-            r=50,
-            b=40,
-            t=40,
-        ),
-        title={
-            'text': str(alt_data_to_graph),
-            'y':0.95,
-            'x':0.501,
-            'xanchor': 'center',
-            'yanchor': 'top'
-        },
-        hovermode="x unified",
-    )
-    fig.update_xaxes(
-        title="Position",
-        range=dataRange,
-        showline=True,
-        showgrid=xaxis_gridlines,
-        linewidth=axis_line_width,
-    )
-    fig.update_yaxes(
-        fixedrange=True,
-        linewidth=axis_line_width,
-        range=y_range,
-        showgrid=yaxis_gridlines,
-        showline=True,
-        title="Edit me",
-    )
+    if whole_genome:
+        fig = px.line(
+            topology_df,
+            x="Window",
+            y=alt_data_to_graph,
+            color_discrete_sequence=list(color_mapping.values()),
+            facet_row="Chromosome",
+        )
+        fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+        fig.update_layout(
+            template=template,
+            margin=dict(
+                l=60,
+                r=50,
+                b=40,
+                t=40,
+            ),
+            title={
+                'text': str(alt_data_to_graph),
+                'x':0.5,
+                'xanchor': 'center',
+                'yanchor': 'top',
+            },
+            hovermode="x unified",
+            font=dict(family=font_family,),
+            height=100*len(topology_df["Chromosome"].unique()),
+        )
+    else:
+        fig = px.line(
+            topology_df,
+            x="Window",
+            y=alt_data_to_graph,
+            color_discrete_sequence=list(color_mapping.values()),
+        )
+        fig.update_layout(
+            template=template,
+            margin=dict(
+                l=60,
+                r=50,
+                b=40,
+                t=40,
+            ),
+            title={
+                'text': str(alt_data_to_graph),
+                'x':0.5,
+                'xanchor': 'center',
+                'yanchor': 'top',
+            },
+            hovermode="x unified",
+            font=dict(family=font_family,),
+        )
+
+    # Update X-axis
+    if dataRange:
+        fig.update_xaxes(
+            title="Position",
+            range=dataRange,
+            showline=True,
+            showgrid=xaxis_gridlines,
+            linewidth=axis_line_width,
+        )
+    else:
+        fig.update_xaxes(
+            title="Position",
+            showline=True,
+            showgrid=xaxis_gridlines,
+            linewidth=axis_line_width,
+
+        )
+    if y_max < 0.1:
+        fig.update_yaxes(
+            fixedrange=True,
+            linewidth=axis_line_width,
+            range=y_range,
+            showgrid=yaxis_gridlines,
+            showline=True,
+            title="Edit me",
+            showexponent = 'all',
+            exponentformat = 'e',
+        )
+    else:
+        fig.update_yaxes(
+            fixedrange=True,
+            linewidth=axis_line_width,
+            range=y_range,
+            showgrid=yaxis_gridlines,
+            showline=True,
+            title="Edit me",
+        )
     return fig
 
 
 # ----------------------------------------------------------------------------------------
-# ----------------------------- Distribution Graph Functions -----------------------------
+# -------------------------- Single Chromosome Graph Functions ---------------------------
 def build_histogram_with_rug_plot(
     topology_df,
     chromosome,
@@ -638,6 +971,7 @@ def build_histogram_with_rug_plot(
     axis_line_width,
     xaxis_gridlines,
     yaxis_gridlines,
+    font_family,
 ):
     # --- Set up topology data ---
     # Extract current topology data
@@ -654,9 +988,8 @@ def build_histogram_with_rug_plot(
             missing_row = pd.DataFrame(data={i:j for i,j in zip(wanted_rows.columns, missing_row_data)}, index=[0])
             wanted_rows = pd.concat([wanted_rows, missing_row])
 
-
     # Group data by topology ID
-    grouped_topology_df = wanted_rows.groupby(by='TopologyID')
+    grouped_topology_df = wanted_rows.sort_values(['TopologyID'],ascending=False).groupby(by='TopologyID')
 
     # Set row heights based on number of current_topologies being shown
     if len(current_topologies) <= 6:
@@ -666,22 +999,9 @@ def build_histogram_with_rug_plot(
     else:
         subplot_row_heights = [8, 2]
     # Build figure
-    fig = make_subplots(rows=2, cols=1, row_heights=subplot_row_heights, vertical_spacing=0.05, shared_xaxes=True)
+    # fig = make_subplots(rows=2, cols=1, row_heights=subplot_row_heights, vertical_spacing=0.05, shared_xaxes=True)
+    fig = make_subplots(rows=2, cols=1, vertical_spacing=0.05, shared_xaxes=True)
     for topology, data in grouped_topology_df:
-        # fig.add_trace(
-        #     go.Scattergl(
-        #         x=data['Window'],
-        #         y=data['TopologyID'],
-        #         name=topology,
-        #         legendgroup=topology,
-        #         mode='markers',
-        #         marker_symbol='line-ns-open',
-        #         marker_size=int(50/len(grouped_topology_df)),
-        #         marker_line_width=1,
-        #         marker_color=[color_mapping[topology]]*len(data),
-        #     ),
-        #     row=1, col=1,
-        # )
         fig.add_trace(
             go.Scatter(
                 x=data['Window'],
@@ -690,22 +1010,30 @@ def build_histogram_with_rug_plot(
                 legendgroup=topology,
                 mode='markers',
                 marker_symbol='line-ns-open',
-                marker_size=int(50/len(grouped_topology_df)),
                 marker_line_width=1,
                 marker_color=[color_mapping[topology]]*len(data),
             ),
+            # go.Box(
+            #     x=data['Window'],
+            #     y=data['TopologyID'],
+            #     boxpoints='all',
+            #     jitter=0,
+            #     legendgroup=topology,
+            #     marker_symbol='line-ns-open',
+            #     marker_color=color_mapping[topology],
+            #     name=topology,
+            # ),
             row=1, col=1,
         )
         fig.add_trace(
-            go.Histogram(
+            go.Bar(
                 x=data['Window'],
                 y=[1]*len(data),
-                histfunc="min",
-                nbinsx=int(chromosome_df["End"].max() / window_size),
                 name=topology,
                 legendgroup=topology,
                 showlegend=False,
                 marker_color=color_mapping[topology],
+                marker_line_width=0,
             ),
             row=2, col=1
         )
@@ -725,9 +1053,10 @@ def build_histogram_with_rug_plot(
             y=1.02,
             xanchor="left",
             x=0,
-            traceorder='normal',
+            itemsizing='constant'
         ),
         hovermode="x unified",
+        font=dict(family=font_family,),
     )
     fig.update_xaxes(
         rangemode="tozero",
@@ -785,6 +1114,7 @@ def build_rug_plot(
     axis_line_width,
     xaxis_gridlines,
     yaxis_gridlines,
+    font_family,
 ):
     # --- Group wanted data ---
     if (type(current_topologies) == str) or (type(current_topologies) == int):
@@ -836,9 +1166,9 @@ def build_rug_plot(
             traceorder='normal',
         ),
         hovermode="x unified",
+        font=dict(family=font_family,),
     )
     fig.update_xaxes(
-        fixedrange=True,
         rangemode="tozero",
         range=dataRange,
         linewidth=axis_line_width,
@@ -870,6 +1200,7 @@ def build_tile_plot(
     axis_line_width,
     xaxis_gridlines,
     yaxis_gridlines,
+    font_family,
 ):
     # Extract current topology data
     if (type(current_topologies) == str) or (type(current_topologies) == int):
@@ -924,9 +1255,9 @@ def build_tile_plot(
             traceorder='normal',
         ),
         hovermode="x unified",
+        font=dict(family=font_family,),
     )
     fig.update_xaxes(
-        fixedrange=True,
         linewidth=axis_line_width,
         rangemode="tozero",
         range=dataRange,
@@ -958,6 +1289,7 @@ def build_alt_data_graph(
     axis_line_width,
     xaxis_gridlines,
     yaxis_gridlines,
+    font_family,
 ):
     # Check input type and graph accordingly
     try:
@@ -976,6 +1308,8 @@ def build_alt_data_graph(
             axis_line_width,
             xaxis_gridlines,
             yaxis_gridlines,
+            font_family,
+            False,
         )
     else:
         alt_data_graph_data = make_alt_data_int_figure(
@@ -988,53 +1322,60 @@ def build_alt_data_graph(
             axis_line_width,
             xaxis_gridlines,
             yaxis_gridlines,
+            font_family,
+            False,
         )
     return alt_data_graph_data
 
 
-def build_RF_heatmap(
-    rfdist_df,
-    template,
+def build_whole_genome_alt_data_graph(
+    alt_data_to_graph,
+    chromosome_df,
     color_mapping,
+    topology_df,
+    window_size,
+    template,
+    y_max,
     axis_line_width,
+    xaxis_gridlines,
+    yaxis_gridlines,
+    font_family,
 ):
-    # Reset index and use to get proper window placement
-    rfdist_df.reset_index(inplace=True)
-    # Create figure + return figure
-    fig = px.bar(
-        rfdist_df,
-        x='index',
-        y='NormRF',
-        color='TopologyID',
-        color_discrete_map=color_mapping,
-        text='NormRF',
-        range_y=[0, 1.2],
-    )
-
-    fig.update_traces(
-        textposition='outside', 
-        texttemplate='%{text:.2f}',
-    )
-    fig.update_xaxes(
-        dtick=1,
-        title='Window',
-        # NOTE: Replace index labels with Window values
-        tickmode = 'array',
-        tickvals = rfdist_df['index'],
-        ticktext = [str(s) for s in rfdist_df['Window']],
-        linewidth=axis_line_width,
+    # Check input type and graph accordingly
+    try:
+        input_type = type(topology_df[alt_data_to_graph].dropna().to_list()[0])
+    except IndexError:
+        return no_data_graph(template)
+    if input_type == str:
+        alt_data_graph_data = make_alt_data_str_figure(
+            alt_data_to_graph,
+            chromosome_df,
+            color_mapping,
+            topology_df,
+            window_size,
+            template,
+            None,
+            axis_line_width,
+            xaxis_gridlines,
+            yaxis_gridlines,
+            font_family,
+            True,
         )
-    fig.update_layout(
-        title={
-            'text': "Normalized RF-Distance",
-            'y':0.9,
-            'x':0.5,
-            'xanchor': 'center',
-            'yanchor': 'top'
-        },
-        template=template,
-    )
-    return fig
+    else:
+        alt_data_graph_data = make_alt_data_int_figure(
+            alt_data_to_graph,
+            color_mapping,
+            topology_df,
+            template,
+            None,
+            y_max,
+            axis_line_width,
+            xaxis_gridlines,
+            yaxis_gridlines,
+            font_family,
+            True,
+        )
+    return alt_data_graph_data
 
 
 def build_gff_figure(
@@ -1044,6 +1385,7 @@ def build_gff_figure(
     axis_line_width,
     xaxis_gridlines,
     yaxis_gridlines,
+    font_family,
 ):
     regionStart, regionEnd = dataRange
     # Show gene names if showing less than 1Mb of data
@@ -1057,15 +1399,33 @@ def build_gff_figure(
     attr_group = data.groupby(by=['feature', 'attribute', 'strand'])
     positive_text_pos = "top center"
     negative_text_pos = "top center"
+    features_graphed = list()
     fig = go.Figure()
-    for fg, gene_data in attr_group:
+    y_idx = 1
+    curr_feature = dict()
+    for fg, gene_data in attr_group:        
         feature, gene, strand = fg
         feature_strand = f"{feature} ({strand})"
         x_values = sorted(gene_data['start'].to_list() + gene_data['end'].to_list())
+        # Update y-axis value if new feature
+        if not curr_feature:
+            curr_feature[feature_strand] = y_idx
+            y_idx += 1
+        elif feature_strand in curr_feature.keys():
+            pass
+        else:
+            curr_feature[feature_strand] = y_idx
+            y_idx += 1
+        # Set legend show if feature in list already
+        if feature_strand in features_graphed:
+            show_legend = False
+        else:
+            show_legend = True
+            features_graphed.append(feature_strand)
         # Set color, y-values, and arrow direction
         if strand == '+':
             colorValue = 'red'
-            y_values = [feature_strand]*len(x_values)
+            y_values = [curr_feature[feature_strand]]*len(x_values)
             markerSymbol = ['square']*(len(x_values)-1) + ['triangle-right']
             text_pos = positive_text_pos
             text_val = [gene] + ['']*(len(x_values)-1)
@@ -1075,7 +1435,7 @@ def build_gff_figure(
                 positive_text_pos = "top center"
         else:
             colorValue = '#009BFF'
-            y_values = [feature_strand]*len(x_values)
+            y_values = [curr_feature[feature_strand]]*len(x_values)
             markerSymbol = ['triangle-left'] + ['square']*(len(x_values)-1)
             text_pos = negative_text_pos
             text_val = ['']*(len(x_values)-1) + [gene]
@@ -1087,8 +1447,8 @@ def build_gff_figure(
             fig.add_trace(go.Scatter(
                 x=x_values,
                 y=y_values,
-                name=gene,
-                # legendgroup=gene,
+                name=feature_strand,
+                legendgroup=feature_strand,
                 mode='markers+lines+text',
                 marker_symbol=markerSymbol,
                 marker_size=8,
@@ -1098,34 +1458,44 @@ def build_gff_figure(
                 textfont=dict(
                     size=10,
                 ),
-                # hoverinfo=['all'],
                 hovertemplate=None,
+                showlegend=show_legend,
             ))
         else:
             fig.add_trace(go.Scatter(
                 x=x_values,
                 y=y_values,
-                name=gene,
-                # legendgroup=gene,
+                name=feature_strand,
+                legendgroup=feature_strand,
                 mode='markers+lines',
                 marker_symbol=markerSymbol,
                 marker_size=8,
                 marker_color=colorValue,
                 # hoverinfo=['all'],
                 hovertemplate=None,
+                showlegend=show_legend,
             ))
     fig.update_layout(
         hovermode="x unified",
-        # hovermode="x",
-        showlegend=False,
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+            traceorder='normal',
+        ),
         template=template,
         title='',
         margin=dict(
-            l=20,
+            l=62,
             r=50,
             b=20,
-            t=40,
+            t=20,
         ),
+        height=150*len(features_graphed),
+        font=dict(family=font_family,),
     )
     fig.update_xaxes(
         range=dataRange,
@@ -1136,42 +1506,251 @@ def build_gff_figure(
         showgrid=xaxis_gridlines,
     )
     fig.update_yaxes(
-        automargin=True,
-        categoryorder='array',
+        range=[0, len(features_graphed)+1],
         fixedrange=True,
-        showticklabels=True,
+        showticklabels=False,
         showgrid=yaxis_gridlines,
         title='',
         linewidth=axis_line_width,
     )
     return fig
 
+# ----------------------------------------------------------------------------------------
+# ------------------------------- Quantile Graph Functions -------------------------------
+def get_quantile_coordinates(
+    chromLengths,
+    QUANTILES,
+    WINDOWSIZE,
+):
+    quantileCoordinates = pd.DataFrame(columns=chromLengths["Chromosome"], index=range(1, QUANTILES+1))
+    for row in chromLengths.itertuples(index=False):
+        chrom, _, end = row
+        chunkSize = end // QUANTILES
+        for i in range(QUANTILES):
+            q = i + 1
+            if q == 1:
+                quantileCoordinates.at[q, chrom] = [0, chunkSize]
+            else:
+                quantileCoordinates.at[q, chrom] = [chunkSize*(q-1) + WINDOWSIZE, chunkSize*q]
+    return quantileCoordinates
+
+
+def calculateFrequencies(
+    quantileCoordinates,
+    input_df,
+    chromLengths,
+    QUANTILES,
+):
+    quantileFrequencies = pd.DataFrame(columns=chromLengths["Chromosome"], index=range(1, QUANTILES+1))
+    topos = input_df["TopologyID"].unique()
+    for chrom in quantileCoordinates.columns:
+        for q, quantile in enumerate(quantileCoordinates[chrom], 1):
+            quantileData = input_df[(input_df['Window'] >= quantile[0]) & (input_df['Window'] <= quantile[1]) & (input_df['Chromosome'] == chrom)]
+            topoQD = quantileData['TopologyID'].value_counts().to_dict()
+            # Add missing topologies as count=0
+            for i in topos:
+                if i not in topoQD.keys():
+                    topoQD[i] = 0
+            quantileFrequencies.at[q, chrom] = topoQD
+            continue
+    return quantileFrequencies
+
+
+def plot_frequencies(
+    quantileFrequencies,
+    n_quantiles,
+    template,
+    color_mapping,
+    axis_line_width,
+    xaxis_gridlines,
+    yaxis_gridlines,
+):
+    def reorganizeDF(df):
+        new_df = pd.DataFrame(columns=['Chr', 'Quantile', 'TopologyID', 'Frequency'])
+        nidx = 0
+        for c in df.columns:
+            for idx in df.index:
+                chromTotal = sum([v for v in df.at[idx, c].values()])
+                for topo, freq in zip(df.at[idx, c].keys(), df.at[idx, c].values()):
+                    new_df.at[nidx, 'TopologyID'] = topo
+                    new_df.at[nidx, 'Chr'] = c
+                    new_df.at[nidx, 'Quantile'] = idx
+                    try:
+                        new_df.at[nidx, 'Frequency'] = int(freq)/chromTotal
+                    except ZeroDivisionError:
+                        new_df.at[nidx, 'Frequency'] = 0.0
+                    nidx += 1
+        return new_df
+    # Organize DataFrame
+    organizedDF= reorganizeDF(quantileFrequencies)
+    # Create line graph
+    fig = px.line(
+        organizedDF,
+        x='Quantile',
+        y='Frequency',
+        color='TopologyID',
+        facet_col='Chr',
+        facet_col_wrap=1,
+        facet_row_spacing=0.01,
+        color_discrete_map=color_mapping,
+    )
+    fig.update_traces(texttemplate='%{text:.3}', textposition='top center')
+    if len(organizedDF["Chr"].unique()) == 1:
+        fig.update_layout(
+            uniformtext_minsize=12,
+            template=template,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                traceorder='normal',
+            ),
+            height=300,
+        )
+    else:
+        fig.update_layout(
+            uniformtext_minsize=12,
+            template=template,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                traceorder='normal',
+            ),
+            height=100*len(organizedDF["Chr"].unique()),
+        )
+    fig.update_xaxes(
+        range=[1, n_quantiles],
+        rangemode="tozero",
+        linewidth=axis_line_width,
+        showgrid=xaxis_gridlines,
+    )
+    fig.update_yaxes(
+        range=[0, 1],
+        fixedrange=True,
+        showgrid=yaxis_gridlines,
+        linewidth=axis_line_width,
+    )
+    fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+    return fig
+
+
+def calculate_topo_quantile_frequencies(df, current_topologies, additional_data, n_quantiles):
+    final_df = pd.DataFrame(columns=["TopologyID", "Frequency", "Quantile"])
+    for topology in current_topologies:
+        topo_df = pd.DataFrame(columns=["TopologyID", "Frequency", "Quantile"])
+        tidx = 0
+        df = df.sort_values(by=additional_data)
+        df = df.assign(Quantile = pd.qcut(df[additional_data].rank(method='first'), q=n_quantiles, labels=False))
+        df['Quantile'] = df['Quantile'].apply(lambda x: x+1)
+        df_group = df.groupby(by="Quantile")
+        for rank, data in df_group:
+            counts = data["TopologyID"].value_counts()
+            for t, f in zip(counts.index, counts):
+                if t == topology:
+                    topo_df.at[tidx, "TopologyID"] = t
+                    topo_df.at[tidx, "Frequency"] = f/len(df)
+                    topo_df.at[tidx, "Quantile"] = rank
+                    tidx += 1
+                    break
+                else:
+                    continue
+            # -- Concat dfs -- 
+        final_df = pd.concat([final_df, topo_df])
+    return final_df
+
+
+def plot_frequencies_topo_quantile(
+    final_df,
+    template,
+    color_mapping,
+    axis_line_width,
+    xaxis_gridlines,
+    yaxis_gridlines,
+    graph_title,
+    additional_data
+):
+    fig = px.line(
+        final_df,
+        x="Quantile", y="Frequency",
+        color="TopologyID",
+        color_discrete_map=color_mapping,
+        markers=True,
+    )
+    fig.update_layout(
+        template=template,
+        title=graph_title,
+        title_x=0.5,
+        margin=dict(
+            t=80
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="left",
+            x=0,
+            # itemsizing='constant'
+        ),
+    )
+    fig.update_xaxes(
+        title=f"{additional_data} Quantiles",
+        linewidth=axis_line_width,
+        showgrid=xaxis_gridlines,
+        tick0=0,
+        dtick=1,
+    )
+    fig.update_yaxes(
+        rangemode="tozero",
+        linewidth=axis_line_width,
+        showgrid=yaxis_gridlines,
+        title='% Windows Observed',        
+    )
+    return fig
 
 # ---------------------------------------------------------------------------------
-# -------------------------------- Stats Tab Graphs -------------------------------
+# -------------------------------- Whole Genome Graph Functions -------------------------------
 
-def build_topology_frequency_pie_chart(df, template, color_mapping):
+def build_topology_frequency_pie_chart(
+    df,
+    template,
+    color_mapping,
+    font_family,
+):
+    """Returns pie graph for whole genome topology frequencies"""
     fig = px.pie(
         df,
         values='Frequency',
         names='TopologyID',
-        template=template,
+        color="TopologyID",
         color_discrete_map=color_mapping,
-        hover_data=['TopologyID'],
-        title='Whole Genome Frequencies'
+        template=template,
+        title='Whole Genome Topology Frequencies',
     )
     fig.update_traces(textposition='inside')
     fig.update_layout(
+        margin=dict(l=120, r=20, t=40, b=10),
         uniformtext_minsize=12,
         uniformtext_mode='hide',
-        showlegend=False,
-        margin=dict(l=20, r=20, t=40, b=10),
+        legend=dict(itemclick=False, itemdoubleclick=False),
         title_x=0.5,
+        font=dict(family=font_family,),
     )
     return fig
 
 
-def build_rf_graph(df, ref_topo, template, color_mapping, axis_line_width):
+def build_rf_graph(
+    df,
+    ref_topo,
+    template,
+    color_mapping,
+    axis_line_width,
+    font_family,
+):
     fig = px.bar(
         df, x="TopologyID", y="normRF-Distance",
         color="TopologyID", color_discrete_map=color_mapping,
@@ -1181,13 +1760,14 @@ def build_rf_graph(df, ref_topo, template, color_mapping, axis_line_width):
         title=f"Normalized RF-Distance from {ref_topo}",
         title_x=0.5,
         template=template,
+        font=dict(family=font_family,),
     )
     fig.update_xaxes(linewidth=axis_line_width)
     fig.update_yaxes(linewidth=axis_line_width, range=[0, 1])
     return fig
 
 
-def build_stats_chromosome_freq_rug_plot(
+def build_whole_genome_rug_plot(
     df,
     chrom_df,
     chromGroup,
@@ -1199,37 +1779,35 @@ def build_stats_chromosome_freq_rug_plot(
     axis_line_width,
     xaxis_gridlines,
     yaxis_gridlines,
+    wg_squish_expand,
+    font_family,
 ):
-    df = df[df['TopologyID'].isin(currTopologies)]
-    df = df[df['Chromosome'].isin(chromGroup)]
-
+    df = df[(df['TopologyID'].isin(currTopologies)) & (df['Chromosome'].isin(chromGroup))]
     grouped_topology_df = df.groupby(by='TopologyID')
     num_chroms = len(df['Chromosome'].unique())
     chrom_row_dict = {chrom:i for chrom, i in zip(sorted(df['Chromosome'].unique()), range(1, len(df['Chromosome'].unique())+1, 1))}
-    row_heights = [1]*num_chroms
     chrom_shapes = []
+    row_height = [2]*num_chroms
     # --- Build figure ---
     # If chromosome name longer than 5 characters, use subplot titles 
     # instead of row ittles
     if df.Chromosome.map(len).max() > 5:
         fig = make_subplots(
             rows=num_chroms,
-            # row_heights=row_heights,
-            subplot_titles=df['Chromosome'].unique(),
+            subplot_titles=chrom_row_dict.keys(),
             shared_xaxes=True,
-            vertical_spacing=0.01,
             cols=1,
+            row_heights=row_height,
         )
     else:
         fig = make_subplots(
             rows=num_chroms,
-            # row_heights=row_heights,
-            row_titles=[c for c in df['Chromosome'].unique()],
+            row_titles=[c for c in chrom_row_dict.keys()],
             shared_xaxes=True,
-            vertical_spacing=0.01,
             cols=1,
+            row_heights=row_height,
         )
-    for topo, data in grouped_topology_df:
+    for topology, data in grouped_topology_df:
         add_legend = True
         for chrom in chrom_row_dict.keys():
             chrom_data = data[data["Chromosome"] == chrom]
@@ -1239,12 +1817,12 @@ def build_stats_chromosome_freq_rug_plot(
                 fig.add_trace(
                     go.Scatter(
                         x=[0],
-                        y=[topo],
-                        name=topo,
-                        legendgroup=topo,
+                        y=[topology],
+                        name=topology,
+                        legendgroup=topology,
                         mode='markers',
                         marker_symbol='line-ns-open',
-                        marker_color=[color_mapping[topo]]*len(chrom_data),
+                        marker_color=[color_mapping[topology]]*len(chrom_data),
                         showlegend = False,
                     ),
                     row=chrom_row_dict[chrom], col=1,
@@ -1254,13 +1832,23 @@ def build_stats_chromosome_freq_rug_plot(
                     go.Scatter(
                         x=chrom_data['Window'],
                         y=chrom_data['TopologyID'],
-                        name=topo,
-                        legendgroup=topo,
+                        name=topology,
+                        legendgroup=topology,
                         mode='markers',
                         # marker_size=int(25/len(grouped_topology_df)),
                         marker_symbol='line-ns-open',
-                        marker_color=[color_mapping[topo]]*len(chrom_data),
+                        marker_color=[color_mapping[topology]]*len(chrom_data),
                     ),
+                    # go.Box(
+                    #     x=chrom_data['Window'],
+                    #     y=chrom_data['TopologyID'],
+                    #     boxpoints='all',
+                    #     jitter=0,
+                    #     legendgroup=topology,
+                    #     marker_symbol='line-ns-open',
+                    #     marker_color=color_mapping[topology],
+                    #     name=topology,
+                    # ),
                     row=chrom_row_dict[chrom], col=1,
                 )
                 chrom_shapes.append(dict(type="line", xref="x", yref="y", x0=chrom_length, x1=chrom_length, y0=-1, y1=len(currTopologies), line_width=2))
@@ -1270,14 +1858,25 @@ def build_stats_chromosome_freq_rug_plot(
                     go.Scatter(
                         x=chrom_data['Window'],
                         y=chrom_data['TopologyID'],
-                        name=topo,
-                        legendgroup=topo,
+                        name=topology,
+                        legendgroup=topology,
                         mode='markers',
                         # marker_size=int(25/len(grouped_topology_df)),
                         marker_symbol='line-ns-open',
-                        marker_color=[color_mapping[topo]]*len(chrom_data),
+                        marker_color=[color_mapping[topology]]*len(chrom_data),
                         showlegend = False,
                     ),
+                    # go.Box(
+                    #     x=chrom_data['Window'],
+                    #     y=chrom_data['TopologyID'],
+                    #     boxpoints='all',
+                    #     jitter=0,
+                    #     marker_symbol='line-ns-open',
+                    #     marker_color=color_mapping[topology],
+                    #     legendgroup=topology,
+                    #     showlegend = False,
+                    #     name=topology,
+                    # ),
                     row=chrom_row_dict[chrom], col=1,
                 )
                 chrom_ref = chrom_row_dict[chrom]
@@ -1301,24 +1900,392 @@ def build_stats_chromosome_freq_rug_plot(
         showticklabels=False,
         linewidth=axis_line_width,
         categoryarray=topoOrder,
-        # matches='y'
     )
-    fig.update_layout(
-        template=template,
-        legend_title_text='Topology',
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="left",
-            x=0,
-            traceorder='normal',
-            itemsizing='constant',
-        ),
-        # hovermode="x unified",
-        height=125*num_chroms,
-        shapes=chrom_shapes,
-        title_x=0.5,
+    if wg_squish_expand == 'expand':
+        if num_chroms < 5:
+            fig.update_layout(
+                template=template,
+                legend_title_text='Topology',
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    traceorder='normal',
+                    itemsizing='constant',
+                ),
+                height=160*num_chroms,
+                shapes=chrom_shapes,
+                title_x=0.5,
+                font=dict(family=font_family,),
+            )
+        else:
+            fig.update_layout(
+                template=template,
+                legend_title_text='Topology',
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    traceorder='normal',
+                    itemsizing='constant',
+                ),
+                height=100*num_chroms,
+                shapes=chrom_shapes,
+                title_x=0.5,
+                font=dict(family=font_family,),
+            )
+    elif wg_squish_expand == 'squish':
+        if num_chroms < 5:
+            fig.update_layout(
+                template=template,
+                legend_title_text='Topology',
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    traceorder='normal',
+                    itemsizing='constant',
+                ),
+                height=125*num_chroms,
+                shapes=chrom_shapes,
+                title_x=0.5,
+                font=dict(family=font_family,),
+            )
+        else:
+            fig.update_layout(
+                template=template,
+                legend_title_text='Topology',
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    traceorder='normal',
+                    itemsizing='constant',
+                ),
+                height=50*num_chroms,
+                shapes=chrom_shapes,
+                title_x=0.5,
+                font=dict(family=font_family,),
+            )
+    else:
+        if num_chroms < 5:
+            fig.update_layout(
+                template=template,
+                legend_title_text='Topology',
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    traceorder='normal',
+                    itemsizing='constant',
+                ),
+                height=105*num_chroms,
+                shapes=chrom_shapes,
+                title_x=0.5,
+                font=dict(family=font_family,),
+            )
+        else:
+            fig.update_layout(
+                template=template,
+                legend_title_text='Topology',
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    traceorder='normal',
+                    itemsizing='constant',
+                ),
+                height=20*num_chroms,
+                shapes=chrom_shapes,
+                title_x=0.5,
+                margin=dict(
+                    t=10,
+                    b=30,
+                ),
+                font=dict(family=font_family,),
+            )
+    
+    # Rotate chromosome names to 0-degrees
+    for annotation in fig['layout']['annotations']: 
+        annotation['textangle']=0
+        annotation['align']="center"
+    return fig
+
+
+def build_whole_genome_tile_plot(
+    df,
+    chrom_df,
+    template,
+    color_mapping,
+    currTopologies,
+    topoOrder,
+    window_size,
+    axis_line_width,
+    chromGroup,
+    xaxis_gridlines,
+    yaxis_gridlines,
+    wg_squish_expand,
+    font_family,
+):
+    """
+    Max chromosomes per graph if # current_topologies <= 3: 20
+    Max chromosomes per graph if # current_topologies > 3: 20/2
+
+    Returns: List of figures to display
+    """
+    df = df[df['TopologyID'].isin(currTopologies)]
+    df = df[df['Chromosome'].isin(chromGroup)]
+    grouped_topology_df = df.groupby(by='TopologyID')
+    num_chroms = len(df['Chromosome'].unique())
+    chrom_row_dict = {chrom:i for chrom, i in zip(sorted(df['Chromosome'].unique()), range(1, len(df['Chromosome'].unique())+1, 1))}
+    chrom_shapes = []
+    # --- Build figure ---
+    # If longest chromosome name longer 
+    # than 5 characters, use subplot titles 
+    # instead of row titles
+    if df.Chromosome.map(len).max() > 5:
+        fig = make_subplots(
+            rows=num_chroms,
+            cols=1,
+            shared_xaxes=True,
+            subplot_titles=chrom_row_dict.keys(),
+            vertical_spacing=0.03, 
+        )
+    else:
+        fig = make_subplots(
+            rows=num_chroms,
+            cols=1,
+            shared_xaxes=True,
+            row_titles=[c for c in chrom_row_dict.keys()],
+            vertical_spacing=0.001,
+        )
+    for topology, data in grouped_topology_df:
+        add_legend = True
+        for chrom in chrom_row_dict.keys():
+            chrom_data = data[data["Chromosome"] == chrom]
+            chrom_length_data = chrom_df[chrom_df['Chromosome'] == chrom]
+            chrom_length = chrom_length_data['End'].max()
+            if add_legend:
+                fig.add_trace(
+                    go.Histogram(
+                        x=chrom_data['Window'],
+                        y=[1]*len(chrom_data),
+                        nbinsx=int(chrom_length/window_size),
+                        name=topology,
+                        legendgroup=topology,
+                        marker_line_width=0,
+                        marker_color=color_mapping[topology],
+                    ),
+                    row=chrom_row_dict[chrom], col=1,
+                )
+                chrom_shapes.append(dict(type="line", xref="x", yref="y", x0=chrom_length, x1=chrom_length, y0=0, y1=1, line_width=2))
+                add_legend = False
+            else:
+                fig.add_trace(
+                    go.Histogram(
+                        x=chrom_data['Window'],
+                        y=[1]*len(chrom_data),
+                        nbinsx=int(chrom_length/window_size),
+                        name=topology,
+                        legendgroup=topology,
+                        marker_line_width=0,
+                        marker_color=color_mapping[topology],
+                        showlegend = False
+                    ),
+                    row=chrom_row_dict[chrom], col=1,
+                )
+                chrom_ref = chrom_row_dict[chrom]
+                chrom_shapes.append(dict(type="rect", xref=f"x{chrom_ref}", yref=f"y{chrom_ref}", x0=chrom_length, x1=chrom_length, y0=0, y1=1, line_width=2))
+
+    # Update layout + axes
+    if wg_squish_expand == 'expand':
+        if num_chroms < 5:
+                fig.update_layout(
+                barmode="relative",
+                template=template,
+                legend_title_text='Topology',
+                margin=dict(
+                    l=60,
+                    r=50,
+                    b=40,
+                    t=40,
+                ),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    traceorder='normal',
+                    itemsizing='constant',
+                ),
+                hovermode="x unified",
+                height=130*num_chroms,
+                shapes=chrom_shapes,
+                title_x=0.5,
+                font=dict(family=font_family,),
+            )
+        else:
+            fig.update_layout(
+                barmode="relative",
+                template=template,
+                legend_title_text='Topology',
+                margin=dict(
+                    l=60,
+                    r=50,
+                    b=40,
+                    t=40,
+                ),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    traceorder='normal',
+                    itemsizing='constant',
+                ),
+                hovermode="x unified",
+                height=100*num_chroms,
+                shapes=chrom_shapes,
+                title_x=0.5,
+                font=dict(family=font_family,),
+            )
+    elif wg_squish_expand == 'squish':
+        if num_chroms < 5:
+            fig.update_layout(
+                barmode="relative",
+                template=template,
+                legend_title_text='Topology',
+                margin=dict(
+                    l=60,
+                    r=50,
+                    b=40,
+                    t=40,
+                ),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    traceorder='normal',
+                    itemsizing='constant',
+                ),
+                hovermode="x unified",
+                height=80*num_chroms,
+                shapes=chrom_shapes,
+                title_x=0.5,
+                font=dict(family=font_family,),
+            )
+        else:
+            fig.update_layout(
+                barmode="relative",
+                template=template,
+                legend_title_text='Topology',
+                margin=dict(
+                    l=60,
+                    r=50,
+                    b=40,
+                    t=40,
+                ),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    traceorder='normal',
+                    itemsizing='constant',
+                ),
+                hovermode="x unified",
+                height=50*num_chroms,
+                shapes=chrom_shapes,
+                title_x=0.5,
+                font=dict(family=font_family,),
+            )
+    else:
+        if num_chroms < 5:
+            fig.update_layout(
+                barmode="relative",
+                template=template,
+                legend_title_text='Topology',
+                margin=dict(
+                    l=60,
+                    r=50,
+                    b=40,
+                    t=40,
+                ),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    traceorder='normal',
+                    itemsizing='constant',
+                ),
+                hovermode="x unified",
+                height=55*num_chroms,
+                shapes=chrom_shapes,
+                title_x=0.5,
+                font=dict(family=font_family,),
+            )
+        else: 
+            fig.update_layout(
+                barmode="relative",
+                template=template,
+                legend_title_text='Topology',
+                margin=dict(
+                    l=60,
+                    r=50,
+                    b=40,
+                    t=40,
+                ),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0,
+                    traceorder='normal',
+                    itemsizing='constant',
+                ),
+                hovermode="x unified",
+                height=20*num_chroms,
+                shapes=chrom_shapes,
+                title_x=0.5,
+                font=dict(family=font_family,),
+            )
+    fig.update_xaxes(
+        linewidth=axis_line_width,
+        fixedrange=True,
+        rangemode="tozero",
+        range=[0, chrom_df['End'].max()],
+        ticklen=0,
+        showgrid=xaxis_gridlines,
+    )
+    fig.update_yaxes(
+        # categoryarray=topoOrder,
+        range=[0, 1],
+        fixedrange=True,
+        linewidth=axis_line_width,
+        showgrid=yaxis_gridlines,
+        showticklabels=False,
+        title="",
+        ticklen=0,
     )
     # Rotate chromosome names to 0-degrees
     for annotation in fig['layout']['annotations']: 
@@ -1327,7 +2294,7 @@ def build_stats_chromosome_freq_rug_plot(
     return fig
 
 
-def build_stats_chromosome_freq_bar_plot(
+def build_whole_genome_bar_plot(
     df,
     template,
     color_mapping,
@@ -1336,6 +2303,7 @@ def build_stats_chromosome_freq_bar_plot(
     chromGroup,
     xaxis_gridlines,
     yaxis_gridlines,
+    font_family,
 ):
     # Filter df to chromosomes in group
     df = df[df['Chromosome'].isin(chromGroup)]
@@ -1388,6 +2356,7 @@ def build_stats_chromosome_freq_bar_plot(
             )
         ],
         title_x=0.5,
+        font=dict(family=font_family,),
     )
     fig.update_xaxes(
         title="",
@@ -1403,11 +2372,12 @@ def build_stats_chromosome_freq_bar_plot(
     return fig
 
 
-def build_stats_chromosome_freq_pie_plot(
+def build_whole_genome_pie_charts(
     df,
     template,
     color_mapping,
     chromGroup,
+    font_family,
 ):
     # Filter df to chromosomes in group
     df = df[df['Chromosome'].isin(chromGroup)]
@@ -1419,175 +2389,331 @@ def build_stats_chromosome_freq_pie_plot(
         specs=specs,
         vertical_spacing=0.03,
         horizontal_spacing=0.001,
-        subplot_titles=df["Chromosome"].unique(),
-        # row_heights=[2]*number_of_chrom_rows,
+        subplot_titles=sorted(df["Chromosome"].unique()),
         column_widths=[2]*3,
     )
     col_pos = 1
     row_num = 1
-    for c in df['Chromosome'].unique():
+    for c in sorted(df['Chromosome'].unique()):
         chrom_df = df[df["Chromosome"] == c]
-        fig.add_trace(go.Pie(labels=chrom_df["TopologyID"], values=chrom_df['Frequency']), row=row_num, col=col_pos)
+        fig.add_trace(go.Pie(labels=chrom_df["TopologyID"], values=chrom_df['Frequency'], marker_colors=list(color_mapping.values())), row=row_num, col=col_pos)
         if col_pos == 3:
             col_pos = 1
             row_num += 1
         else:
             col_pos += 1
+    
     fig.update_traces(textposition='inside')
     fig.update_layout(
         uniformtext_minsize=12, 
-        # uniformtext_mode='hide',
-        
         showlegend=True,
-        # margin=dict(l=20, r=20, t=40, b=10),
         template=template,
         height=int(200*number_of_chrom_rows),
+        font=dict(family=font_family,),
     )
     return fig
 
 
-def build_stats_chromosome_freq_tile_plot(
-    df,
-    chrom_df,
-    template,
-    color_mapping,
-    currTopologies,
-    topoOrder,
-    window_size,
-    axis_line_width,
-    chromGroup,
-    xaxis_gridlines,
-    yaxis_gridlines,
-):
-    """
-    Max chromosomes per graph if # current_topologies <= 3: 20
-    Max chromosomes per graph if # current_topologies > 3: 20/2
-
-    Returns: List of figures to display
-    """
-    df = df[df['TopologyID'].isin(currTopologies)]
-    df = df[df['Chromosome'].isin(chromGroup)]
-    grouped_topology_df = df.groupby(by='TopologyID')
-    num_chroms = len(df['Chromosome'].unique())
-    chrom_row_dict = {chrom:i for chrom, i in zip(sorted(df['Chromosome'].unique()), range(1, len(df['Chromosome'].unique())+1, 1))}
-    row_heights = [1]*num_chroms
-    chrom_shapes = []
-    # --- Build figure ---
-    # If longest chromosome name longer 
-    # than 5 characters, use subplot titles 
-    # instead of row ittles
-    if df.Chromosome.map(len).max() > 5:
-        fig = make_subplots(
-            rows=num_chroms,
-            # row_heights=row_heights,
-            subplot_titles=df['Chromosome'].unique(),
-            vertical_spacing=0.01,
-            cols=1,
-            shared_xaxes=True,
-        )
-    else:
-        fig = make_subplots(
-            rows=num_chroms,
-            # row_heights=row_heights,
-            cols=1,
-            shared_xaxes=True,
-            vertical_spacing=0.001,
-            row_titles=[c for c in df['Chromosome'].unique()]
-        )
-    for topo, data in grouped_topology_df:
-        add_legend = True
-        for chrom in chrom_row_dict.keys():
-            chrom_data = data[data["Chromosome"] == chrom]
-            chrom_length_data = chrom_df[chrom_df['Chromosome'] == chrom]
-            chrom_length = chrom_length_data['End'].max()
-            if add_legend:
-                fig.add_trace(
-                    go.Scatter(
-                        x=chrom_data['Window'],
-                        y=[1]*len(chrom_data),
-                        name=topo,
-                        legendgroup=topo,
-                        mode='markers',
-                        marker_symbol='line-ns-open',
-                        marker_size=50,
-                        marker_line_width=1,
-                        marker_color=[color_mapping[topo]]*len(chrom_data),
-                        # showlegend = False
-                    ),
-                    row=chrom_row_dict[chrom], col=1,
-                )
-                chrom_shapes.append(dict(type="line", xref="x", yref="y", x0=chrom_length, x1=chrom_length, y0=-1, y1=len(currTopologies), line_width=2))
-                add_legend = False
+# ---------------------------------------------------------------------------------
+# --------------------------- Stats DataFrame Generators --------------------------
+def _get_valid_cols(topology_df):
+        valid_cols = list()
+        for i in topology_df.columns[4:]:
+            data = topology_df[i].unique()
+            flag = None
+            for j in data:
+                if type(j) == str:
+                    flag = False
+                    break
+                else:
+                    flag = True
+            if flag:
+                valid_cols.append(i)
             else:
-                fig.add_trace(
-                    go.Scatter(
-                        x=chrom_data['Window'],
-                        y=[1]*len(chrom_data),
-                        name=topo,
-                        legendgroup=topo,
-                        mode='markers',
-                        marker_symbol='line-ns-open',
-                        marker_size=50,
-                        marker_line_width=1,
-                        marker_color=[color_mapping[topo]]*len(chrom_data),
-                        showlegend = False
-                    ),
-                    row=chrom_row_dict[chrom], col=1,
-                )
-                chrom_ref = chrom_row_dict[chrom]
-                chrom_shapes.append(dict(type="rect", xref=f"x{chrom_ref}", yref=f"y{chrom_ref}", x0=chrom_length, x1=chrom_length, y0=-1, y1=len(currTopologies), line_width=2))
-    # Set graph height
-    if num_chroms < 5:
-        graph_height = 100*num_chroms
-    else:
-        graph_height = 75*num_chroms
+                continue
+        return valid_cols
 
-    # Update layout + axes
+
+def basic_stats_dfs(topology_df):
+    """Generate dataframes of basic statistics
+
+    :param topology_df: Current View Tree Viewer input file dataframe
+    :type topology_df: Object
+    """
+    # Calculate current view topologies
+    topo_freq_df = pd.DataFrame(topology_df["TopologyID"].value_counts()/len(topology_df))
+    if len(topo_freq_df) > 25:  # If more than 25 topologies loaded, just show top 25
+        topo_freq_df = topo_freq_df.head(25)
+        remainder_freq = 1.0 - sum(topo_freq_df['TopologyID'])
+        topo_freq_df.at["Other", "TopologyID"] = remainder_freq
+    topo_names = [i for i in topo_freq_df.index]
+    topo_freqs = [round(i, 4) for i in topo_freq_df["TopologyID"]]
+    # Calculate median + average of additional data
+    if len(topology_df.columns) > 4:
+        valid_cols = _get_valid_cols(topology_df)
+        additional_dt_names = [i for i in valid_cols]
+        additional_dt_avg = [topology_df[i].mean() for i in valid_cols]
+        additional_dt_std = [topology_df[i].std() for i in valid_cols]
+        topo_freq_df = pd.DataFrame(
+            {
+                "TopologyID": topo_names,
+                "Frequency": topo_freqs,
+            }
+        )
+        additional_data_df = pd.DataFrame(
+            {
+                "Additional Data": additional_dt_names,
+                "Average": additional_dt_avg,
+                "Std Dev": additional_dt_std,
+            }
+        )
+        return topo_freq_df, additional_data_df
+    else:  # No additional data types present in file
+        topo_freq_df = pd.DataFrame(
+            {
+                "TopologyID": topo_names,
+                "Frequency": topo_freqs,
+            }
+        )
+        return topo_freq_df, pd.DataFrame()
+
+
+def current_view_topo_freq_chart(basic_stats_topo_freqs, template, color_mapping):
+    """Return pie chart figure object for local topology frequencies
+
+    :param basic_stats_topo_freqs: Dataframe of topology frequencies
+    :type basic_stats_topo_freqs: DataFrame
+    :return: Plotly express pie chart
+    :rtype: Figure object
+    """
+    if "Other" in basic_stats_topo_freqs["TopologyID"].to_list():
+        fig = px.bar(
+            basic_stats_topo_freqs,
+            x='TopologyID',
+            y="Frequency",
+            color="TopologyID",
+            color_discrete_map=color_mapping,
+            text="Frequency",
+        )
+        fig.update_layout(
+            template=template,
+            uniformtext_minsize=12, 
+            uniformtext_mode='hide',
+        )
+        fig.update_traces(textposition='outside')
+        return fig
+    else:
+        fig = px.pie(
+            basic_stats_topo_freqs,
+            values="Frequency",
+            names="TopologyID",
+            color="TopologyID",
+            color_discrete_map=color_mapping,
+            template=template,
+            title="Current View Topology Frequencies",
+        )
+        fig.update_layout(
+            legend=dict(itemclick=False, itemdoubleclick=False),
+            margin=dict(l=120, r=20, t=40, b=10),
+            uniformtext_minsize=12, 
+            uniformtext_mode='hide',
+            title_x=0.5,
+        )
+        fig.update_traces(textposition='inside')
+        
+        return fig
+
+
+def whole_genome_datatable(tv_df):
+    valid_cols = _get_valid_cols(tv_df[4:])
+    for i in tv_df.columns.to_list()[4:]:
+        if i in valid_cols:
+            continue
+        else:
+            tv_df.drop(labels=i, axis=1, inplace=True)
+    df_group = tv_df.groupby(by="TopologyID")
+    out_df = pd.DataFrame(columns=["TopologyID", "Additional Data", "Num. Windows", "Average", "Std Dev"])
+    idx = 0
+    for topology, data in df_group:
+        additional_datatypes = [i for i in data.columns[4:]]
+        for datatype in additional_datatypes:
+            dt_data = data[datatype]
+            mean = dt_data.mean()
+            stdev = dt_data.std()
+            out_df.at[idx, "TopologyID"] = topology
+            out_df.at[idx, "Additional Data"] = datatype
+            out_df.at[idx, "Num. Windows"] = len(dt_data)
+            out_df.at[idx, "Average"] = mean
+            out_df.at[idx, "Std Dev"] = stdev
+            idx += 1
+            continue
+    columns = [{'id': c, 'name': ["Per-Topology Whole Genome Comparison", c], 'type': 'numeric', 'format': Format(precision=4, scheme=Scheme.decimal)} for c in out_df.columns]
+    data = out_df.to_dict('records')
+    return data, columns
+
+# --- post-hoc tests ---
+def mann_whitney_posthoc(tv_df, additional_data_type, pval_adjustment):
+    return sp.posthoc_mannwhitney(tv_df, val_col=additional_data_type, group_col='TopologyID', p_adjust=pval_adjustment)
+
+
+def dunns_test_posthoc(tv_df, additional_data_type, pval_adjustment):
+    return sp.posthoc_dunn(tv_df, val_col=additional_data_type, group_col='TopologyID', p_adjust=pval_adjustment)
+
+
+def tukeyHSD_posthoc(tv_df, additional_data_type, pval_adjustment, alpha):
+    return sp.posthoc_tukey_hsd(tv_df[additional_data_type], tv_df["TopologyID"], alpha=alpha)
+
+# --- Significance tests ---
+def kruskal_wallis_H_test(tv_df, additional_data_type, posthoc_type, pval_adjustment, alpha):
+    """Return dataframe with Kruskal-Wallis H test information for each topology
+    """
+    d = [tv_df.loc[ids, additional_data_type].values for ids in tv_df.groupby('TopologyID').groups.values()]
+    H, p = ss.kruskal(*d, nan_policy='omit')
+    if posthoc_type == "Mann-Whitney rank test":
+        posthoc = mann_whitney_posthoc(tv_df, additional_data_type, pval_adjustment)
+        posthoc_df = pd.DataFrame(columns=[posthoc_type, "p-value"])
+        idx = 0
+        for c1 in posthoc.columns:
+            for c2, pval in zip(posthoc.index, posthoc[c1]):
+                if c1 == c2:  # Remove self-self comparisons
+                    continue
+                posthoc_df.at[idx, posthoc_type] = f"{c1} vs {c2}"
+                posthoc_df.at[idx, "p-value"] = float(pval)
+                idx += 1
+        data = posthoc_df.to_dict('records')
+        columns = [
+            {'id': posthoc_type, 'name': posthoc_type},
+            {'id': 'p-value', 'name': 'p-value', 'type': 'numeric', 'format': Format(precision=4, scheme=Scheme.decimal_or_exponent)},
+        ]
+    elif posthoc_type == "Dunn's test":
+        posthoc = dunns_test_posthoc(tv_df, additional_data_type, pval_adjustment)
+        posthoc_df = pd.DataFrame(columns=[posthoc_type, "p-value"])
+        idx = 0
+        for c1 in posthoc.columns:
+            for c2, pval in zip(posthoc.index, posthoc[c1]):
+                if c1 == c2:  # Remove self-self comparisons
+                    continue
+                posthoc_df.at[idx, posthoc_type] = f"{c1} vs {c2}"
+                posthoc_df.at[idx, "p-value"] = float(pval)
+                idx += 1
+        data = posthoc_df.to_dict('records')
+        columns = [
+            {'id': posthoc_type, 'name': posthoc_type},
+            {'id': 'p-value', 'name': 'p-value', 'type': 'numeric', 'format': Format(precision=4, scheme=Scheme.decimal_or_exponent)},
+        ]
+    elif posthoc_type == "TukeyHSD":
+        posthoc = tukeyHSD_posthoc(tv_df, additional_data_type, pval_adjustment, alpha)
+        posthoc_df = pd.DataFrame(columns=[posthoc_type, "p-value"])
+        idx = 0
+        for c1 in posthoc.columns:
+            for c2, pval in zip(posthoc.index, posthoc[c1]):
+                if c1 == c2:  # Remove self-self comparisons
+                    continue
+                posthoc_df.at[idx, posthoc_type] = f"{c1} vs {c2}"
+                posthoc_df.at[idx, "p-value"] = float(pval)
+                idx += 1
+        data = posthoc_df.to_dict('records')
+        columns = [
+            {'id': posthoc_type, 'name': posthoc_type},
+            {'id': 'p-value', 'name': 'p-value', 'type': 'numeric', 'format': Format(precision=4, scheme=Scheme.decimal_or_exponent)},
+        ]
+    else:
+        pass
+    
+    return posthoc, data, columns, H, p
+
+
+def one_way_anova(tv_df, additional_data_type, posthoc_type, pval_adjustment, alpha):
+    d = [tv_df.loc[ids, additional_data_type].values for ids in tv_df.groupby('TopologyID').groups.values()]
+    F, p = ss.f_oneway(*d)
+    if posthoc_type == "Mann-Whitney rank test":
+        posthoc = mann_whitney_posthoc(tv_df, additional_data_type, pval_adjustment)
+        posthoc_df = pd.DataFrame(columns=[posthoc_type, "p-value"])
+        idx = 0
+        for c1 in posthoc.columns:
+            for c2, pval in zip(posthoc.index, posthoc[c1]):
+                posthoc_df.at[idx, posthoc_type] = f"{c1} vs {c2}"
+                posthoc_df.at[idx, "p-value"] = float(pval)
+                idx += 1
+        data = posthoc_df.to_dict('records')
+        columns = [
+            {'id': posthoc_type, 'name': posthoc_type},
+            {'id': 'p-value', 'name': 'p-value', 'type': 'numeric', 'format': Format(precision=4, scheme=Scheme.decimal_or_exponent)},
+        ]
+    elif posthoc_type == "Dunn's test":
+        posthoc = dunns_test_posthoc(tv_df, additional_data_type, pval_adjustment)
+        posthoc_df = pd.DataFrame(columns=[posthoc_type, "p-value"])
+        idx = 0
+        for c1 in posthoc.columns:
+            for c2, pval in zip(posthoc.index, posthoc[c1]):
+                posthoc_df.at[idx, posthoc_type] = f"{c1} vs {c2}"
+                posthoc_df.at[idx, "p-value"] = float(pval)
+                idx += 1
+        data = posthoc_df.to_dict('records')
+        columns = [
+            {'id': posthoc_type, 'name': posthoc_type},
+            {'id': 'p-value', 'name': 'p-value', 'type': 'numeric', 'format': Format(precision=4, scheme=Scheme.decimal_or_exponent)},
+        ]
+    elif posthoc_type == "TukeyHSD":
+        posthoc = tukeyHSD_posthoc(tv_df, additional_data_type, pval_adjustment, alpha)
+        posthoc_df = pd.DataFrame(columns=[posthoc_type, "p-value"])
+        idx = 0
+        for c1 in posthoc.columns:
+            for c2, pval in zip(posthoc.index, posthoc[c1]):
+                posthoc_df.at[idx, posthoc_type] = f"{c1} vs {c2}"
+                posthoc_df.at[idx, "p-value"] = float(pval)
+                idx += 1
+        data = posthoc_df.to_dict('records')
+        columns = [
+            {'id': posthoc_type, 'name': posthoc_type},
+            {'id': 'p-value', 'name': 'p-value', 'type': 'numeric', 'format': Format(precision=4, scheme=Scheme.decimal_or_exponent)},
+        ]
+    else:
+        pass
+    
+    return posthoc, data, columns, F, p
+
+
+def stats_test_heatmap(posthoc, template):
+    fig = go.Figure(data=go.Heatmap(
+        z=posthoc.values,
+        x=posthoc.columns,
+        y=posthoc.index,
+        zmin=0,
+        zmax=1,
+        colorscale='Viridis',
+        colorbar=dict(title='p-value'),
+        hovertemplate = 'p-value: %{z}<extra></extra>',
+    ))
     fig.update_layout(
         template=template,
-        legend_title_text='Topology',
+        coloraxis_colorbar=dict(title="log(p-value)"),
         margin=dict(
-            l=60,
-            r=50,
-            b=40,
-            t=40,
+            t=60,
         ),
-        legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="left",
-            x=0,
-            traceorder='normal',
-            itemsizing='constant',
-        ),
-        hovermode="x unified",
-        height=graph_height,
-        shapes=chrom_shapes,
-        title_x=0.5,
     )
-    fig.update_xaxes(
-        linewidth=axis_line_width,
-        fixedrange=True,
-        rangemode="tozero",
-        range=[0, chrom_df['End'].max()],
-        ticklen=0,
-        showgrid=xaxis_gridlines,
-    )
-    fig.update_yaxes(
-        # categoryarray=topoOrder,
-        fixedrange=True,
-        linewidth=axis_line_width,
-        showgrid=yaxis_gridlines,
-        showticklabels=False,
-        title="",
-        ticklen=0,
-    )
-    # Rotate chromosome names to 0-degrees
-    for annotation in fig['layout']['annotations']: 
-        annotation['textangle']=0
-        annotation['align']="center"
     return fig
+
+
+def frequency_distribution(data, name, template):
+    """Return frequency density distribution"""
+    fig = px.histogram(data, x=name, histnorm='density')
+    fig.update_layout(template=template, margin=dict(t=20, pad=30))
+    return fig
+
+
+def mean_frequency_of_alt_data_per_topology(tv_df, topologies, additional_data_type):
+    out_df = pd.DataFrame(columns=["TopologyID", "Total Windows", f"Mean ({additional_data_type})"])
+    idx = 1
+    for i in topologies:
+        topo_df = tv_df[tv_df["TopologyID"] == i]
+        additional_data_mean = topo_df[f"{additional_data_type}"].mean()
+        out_df.at[idx, "TopologyID"] = i
+        out_df.at[idx, "Total Windows"] = len(topo_df)
+        out_df.at[idx, f"Mean ({additional_data_type})"] = additional_data_mean
+        idx += 1
+        continue
+    return out_df.to_dict('records')
 
 # ---------------------------------------------------------------------------------
 # ------------------------- Graph Customization Functions -------------------------
@@ -1607,9 +2733,17 @@ def set_topology_colors(data, color):
 def get_RFxpos(hoverdata, df):
     hoverdata = hoverdata['points'][0]
     if ('customdata' in hoverdata.keys()) or ('marker.color' in hoverdata.keys()):
-        return int(hoverdata['x'])  # Window
+        return int(hoverdata['x'])
     else:
         return df.loc[hoverdata['binNumber']]['Window']
+
+
+def get_Treexpos(hoverdata, df):
+    hoverdata = hoverdata['points'][0]
+    if ('customdata' in hoverdata.keys()) or ('marker.color' in hoverdata.keys()):
+        return int(hoverdata['x'])
+    else:
+        return int(hoverdata['x'])
 
 # ---------------------------------------------------------------------------------
 # ------------------------- Init + Empty Graph Functions --------------------------
@@ -1642,6 +2776,33 @@ def no_data_graph(template):
 
 def init_data_graph(template):
     """
+    This function returns a blank figure with a "NO DATA LOADED" watermark.
+    """
+    fig = go.Figure()
+    fig.update_layout(
+        template=template,
+        annotations=[
+            dict(
+                name="draft watermark",
+                text="NO DATA LOADED",
+                textangle=0,
+                opacity=0.9,
+                font=dict(color="white", size=50),
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.5,
+                showarrow=False,
+            )
+        ],
+    )
+    fig.update_xaxes(range=[0.2, 1], showgrid=False, visible=False, zeroline=False)
+    fig.update_yaxes(range=[0.2, 1], showgrid=False, visible=False, zeroline=False)
+    return fig
+
+
+def init_stats_graph(template):
+    """
     This function returns a blank figure with a "NO DATA" watermark.
     """
     fig = go.Figure()
@@ -1650,10 +2811,10 @@ def init_data_graph(template):
         annotations=[
             dict(
                 name="draft watermark",
-                text="No Data Loaded",
+                text="NO DATA",
                 textangle=0,
                 opacity=0.9,
-                font=dict(color="white", size=50),
+                font=dict(color="white", size=35),
                 xref="paper",
                 yref="paper",
                 x=0.5,
@@ -1754,14 +2915,15 @@ def zoom_in_gff(template):
     """
     fig = go.Figure()
     fig.update_layout(
+        height=300,
         template=template,
         annotations=[
             dict(
                 name="draft watermark",
-                text="Zoom in to view",
+                text="Zoom in to minimum 5Mb to view",
                 textangle=0,
                 opacity=0.9,
-                font=dict(color="white", size=100),
+                font=dict(color="white", size=25),
                 xref="paper",
                 yref="paper",
                 x=0.5,
@@ -1788,14 +2950,14 @@ def validate_chrom_lengths(chromDF, tvDF):
     valid = True
     issue_files = []
     # Check chromosome length file against TV file
-    for c in chrom_names:
-        if c not in tv_chrom_names:
-            missing_chromosomes.append(c)
-            valid = False
-            issue_files.append("Chromosome Length File")
-            continue
-        else:
-            continue
+    # for c in chrom_names:
+    #     if c not in tv_chrom_names:
+    #         missing_chromosomes.append(c)
+    #         valid = False
+    #         issue_files.append("Chromosome Length File")
+    #         continue
+    #     else:
+    #         continue
     # Check TV file against chromosome length file
     for c in tv_chrom_names:
         if c not in chrom_names:
@@ -1807,7 +2969,7 @@ def validate_chrom_lengths(chromDF, tvDF):
             continue
     try:
         if not valid:
-            missing_chroms = "-".join(missing_chromosomes)
+            missing_chroms = ", ".join(missing_chromosomes)
             if len(issue_files) > 1:
                 missing_files = " & ".join(list(set(issue_files)))
             else:
@@ -1822,11 +2984,22 @@ def validate_chrom_lengths(chromDF, tvDF):
 
 def get_taxa_from_tree(tree):
     """Collect leaf names from tree"""
+    if tree == "NoTree":
+        return "NoTree"
     tree = Tree(tree)
     taxa = []
     for leaf in tree.iter_leaves():
         taxa.append(leaf.name)
     return sorted(taxa)
+
+
+def get_valid_init_tree(trees):
+    """Returns first NewickTree entry that is not NoTree"""
+    for i in range(len(trees)):
+        if trees[i] == "NoTree":
+            continue
+        else:
+            return trees[i]
 
 
 def validate_gff_gtf_filename(f):
@@ -1852,36 +3025,6 @@ def get_y_max_list(alt_dropdown_options, topology_df):
         else:
             y_maxes.append(topology_df[i].max())
     return y_maxes
-
-
-def make_basic_info_df(df, topo_freq_df, chrom_lengths, window_size):
-    genome_length = chrom_lengths["End"].sum()
-    avg_chrom_len = int(chrom_lengths["End"].mean())
-    missing_data_coverage = round((100-(len(df) / (data_utils.roundUp(chrom_lengths["End"].sum(), window_size) / window_size) * 100)), 2)
-    number_of_topologies = len(df["TopologyID"].unique())
-    avg_topo_freq = round(topo_freq_df['Frequency'].mean(), 5)
-    median_topo_freq = round(topo_freq_df['Frequency'].median(), 5)
-    df = pd.DataFrame(
-        {
-            "": [
-                "Genome Length",
-                "Average Chromosome Length",
-                "Total Missing Data",
-                "Number of Topologies",
-                "Average Topology Frequency",
-                "Median Topology Frequency",
-            ],
-            " ": [
-                f"{genome_length:,}-bp",
-                f"{avg_chrom_len:,}-bp",
-                f"{missing_data_coverage}%",
-                f"{number_of_topologies:,}",
-                f"{avg_topo_freq}",
-                f"{median_topo_freq}",
-            ]
-        }
-    )
-    return df
 
 
 def validate_tree_viewer_input(df):
@@ -1941,7 +3084,10 @@ def tv_header_validation(df):
 # ---------------------------------------------------------------------------------
 # --------------------------- Tree Prune Export Tools -----------------------------
 def prune_tree(x, prune_taxa_choices):
-    tree = Tree(x)
+    if x == "NoTree":
+        return "NoTree"
+    else:
+        tree = Tree(x)
     try:
         tree.prune(prune_taxa_choices, preserve_branch_length=True)
     except ValueError:
@@ -1956,8 +3102,11 @@ def prune_tree(x, prune_taxa_choices):
 
 
 def remove_heterotachy_info(l):
-    """Remove any information in bracketsete3 
+    """Remove any information in brackets - ete3 
        does not support this format of newick"""
+    # --- Ensure tree is NaN value, if so return NoTree ---
+    if type(l) == float:
+        return "NoTree"
     if ("[" not in l) and ("]" not in l):
         return l
     open_brackets = [i for i, x in enumerate(l) if x == "["]
@@ -1976,7 +3125,9 @@ def tv_topobinner(df):
     topoCount = 1
     
     for n, t in enumerate(trees):
-        if len(topologies.keys()) == 0:
+        if t == "NoTree":
+            continue
+        elif len(topologies.keys()) == 0:
             topologies[n] = {'count': 1, 'idx': [n]}
             continue
         else:
@@ -2005,9 +3156,9 @@ def tv_topobinner(df):
     topologies = {k: v for k, v in sorted(topologies.items(), key=lambda item: item[1]['count'], reverse=True)}
 
     # Update DataFrame TopologyID column with results
-    for topo in topologies.keys():
-        idx = topologies[topo]['idx']
-        topoName = f'topo{topoCount}'
+    for topology in topologies.keys():
+        idx = topologies[topology]['idx']
+        topoName = f'topology{topoCount}'
         for i in idx:
             df.at[i, 'TopologyID'] = topoName
             continue
@@ -2048,3 +3199,36 @@ def get_gridline_bools(axis_gridlines):
         yaxis_gridlines = False
     return xaxis_gridlines, yaxis_gridlines
 
+
+# ---------------------------------------------------------------------------------
+# ----------------------------- Template Generaters -------------------------------
+def project_ini_template():
+    content = """[MAIN]\nProjectDir = /path/to/Project\nTreeViewerFile = /path/to/TreeViewerInput.xlsx\nChromLengths = /path/to/ChromosomeLengths.bed\n\n[ADDITIONAL]\n# Load multiple gff/gtf files by listing them with ";" separating the files\nGFF_GTF = None"""
+    return content
+
+
+def tree_viewer_template():
+    content = pd.DataFrame(columns=["Chromosome", "Window", "NewickTree", "TopologyID"])
+    return content
+
+
+def chrom_len_template():
+    content = pd.DataFrame({"Chromosome": ["chr1", "chr2", "chr3"], "Start": [0, 0, 0], "Stop": [1000000, 1500000, 2000000]})
+    return content
+# ---------------------------------------------------------------------------------
+# ------------------------------- Misc. Functions ---------------------------------
+def divide_input_into_cpu_size_chunks(l, n):
+    """Divides chromosomes into sets of size n, where n
+    is the number of cores available to use"""
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
+
+
+def filter_numeric_dtypes(df):
+    filtered_names = []
+    for name, data_type in zip(df.dtypes.index[4:], df.dtypes[4:]):
+        if str(data_type) == 'object':
+            continue
+        else:
+            filtered_names.append(name)
+    return filtered_names

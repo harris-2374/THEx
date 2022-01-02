@@ -62,6 +62,8 @@ def root_TreeViewer_file(INPUT, updated_TV_dir, TV_OUTGROUP, WORKING_DIR, LOG_LE
     logger.info(f"Setting new outgroup")
     for n, t in enumerate(updated_tv_df["NewickTree"]):
         printProgressBar(n, len(updated_tv_df), prefix = 'Progress:', suffix = 'Complete', length = 50)
+        if t == "NoTree":
+            continue
         tree = Tree(t)
         tree.set_outgroup(TV_OUTGROUP[0])
         updated_tv_df.at[n, "NewickTree"] = tree.write()
