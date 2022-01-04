@@ -7,17 +7,19 @@ import logging
 import math
 import os
 import textwrap
-from multiprocessing import Process, Manager
+from multiprocessing import Manager
+from functools import partial
 
-from tqdm import tqdm
+from p_tqdm import p_umap
 from pyfaidx import Fasta
+from tqdm.auto import tqdm
 
 from thexb.UTIL_checks import check_fasta
 
 ############################### Set up logger #################################
 logger = logging.getLogger(__name__)
 def set_logger_level(WORKING_DIR, LOG_LEVEL):
-    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler = logging.FileHandler(WORKING_DIR / 'logs/pairwise_filter.log')
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
@@ -58,11 +60,11 @@ def CalculatePercentAACoverageForEachSequenceInDictionary(newseqs, lenseqs, PW_M
     """Calculates percent coverage for full-length window and returns a dictionary of coverage per newseq"""
     perccov = {}
     for n in newseqs.keys():
-        num_invalid_bases = 0.0
+        num_valid_bases = 0.0
         for char in newseqs[n]:
             if char != '-' and char != PW_MISSING_CHAR and char.isalpha():
-                num_invalid_bases += 1.0
-        perccov[n] = float(num_invalid_bases/lenseqs)  # NOTE: Keeping as float to match other input variable data types
+                num_valid_bases += 1.0
+        perccov[n] = float(num_valid_bases/lenseqs)  # NOTE: Keeping as float to match other input variable data types
     return perccov
 
 
@@ -231,49 +233,45 @@ def run_pw_per_chromosome(
     countperccovcutoff = 0
     countemptyalignments = 0
 
-    tqdm_text = "#" + f"{chrom.name}"
-    with tqdm(total=len(files), desc=tqdm_text) as pbar:
-        for f in files:
-            # If -DROPPED in filename, write blank output file
-            if "-DROPPED" in str(f.stem):
-                output_fn = filtered_chrom_outdir / f.name
-                with open(output_fn, 'w') as oh:
-                    oh.write("")
-                    continue
+    for f in files:
+        # If -DROPPED in filename, write blank output file
+        if "-DROPPED" in str(f.stem):
+            output_fn = filtered_chrom_outdir / f.name
+            with open(output_fn, 'w') as oh:
+                oh.write("")
+                continue
 
-            with Fasta(str(f), 'fasta') as fh:
-                try:
-                    assert(len(fh.keys()) > 0)
-                    seqs, lenseqs = _make_seq_dict(fh)
-                    numindivs = len(fh.keys())
-                    newseqs = SplitAlignedSeqsIntoWindows(
-                        seqs,
-                        numindivs,
-                        lenseqs,
-                        PW_WINDOW_SIZE,
-                        PW_STEP,
-                        PW_MISSING_CHAR,
-                        PW_REF,
-                        PW_ZSCORE,
-                        PW_PDIST_CUTOFF,
-                    )
-                    perccov = CalculatePercentAACoverageForEachSequenceInDictionary(newseqs, lenseqs, PW_MISSING_CHAR)
-                    # If any window has a percov < PW_PC_CUTOFF then the entire window is rejected
-                    boolean = Return1IfValueIsGreaterThanCutoffForAllInDictionary(perccov, PW_PC_CUTOFF, countshit)
-                    if boolean == 1:
-                        output = FormatDictionaryOfNucleotideSeqsToFasta(newseqs, seqs.keys())
-                        outfile = filtered_chrom_outdir / f"{f.name}"
-                        WriteOUT(outfile, output)
-                    elif boolean == 0:
-                        outfile = filtered_chrom_outdir / f"{f.stem}-DROPPED.fasta"
-                        dropped_files.append(outfile)
-                        WriteOUT(outfile, "")
-                        countperccovcutoff += 1
-
-                except AssertionError:
-                    logger.info(f"{f.name} has no information -- Ignoring")
-                    countemptyalignments += 1
-            pbar.update(1)
+        with Fasta(str(f), 'fasta') as fh:
+            try:
+                assert(len(fh.keys()) > 0)
+                seqs, lenseqs = _make_seq_dict(fh)
+                numindivs = len(fh.keys())
+                newseqs = SplitAlignedSeqsIntoWindows(
+                    seqs,
+                    numindivs,
+                    lenseqs,
+                    PW_WINDOW_SIZE,
+                    PW_STEP,
+                    PW_MISSING_CHAR,
+                    PW_REF,
+                    PW_ZSCORE,
+                    PW_PDIST_CUTOFF,
+                )
+                perccov = CalculatePercentAACoverageForEachSequenceInDictionary(newseqs, lenseqs, PW_MISSING_CHAR)
+                # If any window has a percov < PW_PC_CUTOFF then the entire window is rejected
+                boolean = Return1IfValueIsGreaterThanCutoffForAllInDictionary(perccov, PW_PC_CUTOFF, countshit)
+                if boolean == 1:
+                    output = FormatDictionaryOfNucleotideSeqsToFasta(newseqs, seqs.keys())
+                    outfile = filtered_chrom_outdir / f"{f.name}"
+                    WriteOUT(outfile, output)
+                elif boolean == 0:
+                    outfile = filtered_chrom_outdir / f"{f.stem}-DROPPED.fasta"
+                    dropped_files.append(outfile)
+                    WriteOUT(outfile, "")
+                    countperccovcutoff += 1
+            except AssertionError:
+                logger.info(f"{f.name} has no information -- Ignoring")
+                countemptyalignments += 1
     num_valid_files_remaining = len([i for i in filtered_chrom_outdir.iterdir() if "-DROPPED" not in i.name])
     log_info = [
         "====================================",
@@ -315,77 +313,49 @@ def pairwise_filter(
     # Set cpu count for multiprocessing
     if type(MULTIPROCESS) == int:
         # Ensure not asking for more than available
-        assert int(MULTIPROCESS) <= os.cpu_count()
+        try:
+            assert int(MULTIPROCESS) <= os.cpu_count()
+        except AssertionError:
+            cpu_count = os.cpu_count()
         cpu_count = int(MULTIPROCESS)
     elif MULTIPROCESS == 'all':
         cpu_count = os.cpu_count()
-
+    # Collect chromosome information + run
     chrom_dirs = [f for f in filtered_indir.iterdir() if f.is_dir()]
-    chrom_sets = list(_divide_chunks(chrom_dirs, cpu_count))
-
-    proc_num = 0
-    if cpu_count == 1:
-        for chrom in chrom_dirs:
-            run_pw_per_chromosome(
-                chrom,
-                filtered_outdir,
-                UPDATE_FREQ,
-                PW_WINDOW_SIZE,
-                PW_STEP,
-                PW_PDIST_CUTOFF,
-                PW_REF,
-                PW_MIN_SEQ_LEN,
-                PW_PC_CUTOFF,
-                PW_ZSCORE,
-                PW_EXCLUDE_LIST,
-                PW_MISSING_CHAR,
-                proc_num,
-            )
-            proc_num += 1
-    else:
-        manager = Manager()
-        return_dict = manager.dict()
-        processes = []
-        # Iterate through chroms in sets
-        for cset in chrom_sets:
-            processes.clear()
-            for chrom in cset:
-                process_args = (
-                    chrom,
-                    filtered_outdir,
-                    PW_WINDOW_SIZE,
-                    PW_STEP,
-                    PW_PDIST_CUTOFF,
-                    PW_REF,
-                    PW_MIN_SEQ_LEN,
-                    PW_PC_CUTOFF,
-                    PW_ZSCORE,
-                    PW_EXCLUDE_LIST,
-                    PW_MISSING_CHAR,
-                    return_dict,
-                )
-                processes.append(Process(target=run_pw_per_chromosome, args=process_args))
-                proc_num += 1
-
-            for process in processes:
-                process.start()
-
-            for process in processes:
-                process.join()
-        # Log output information
-        for c in return_dict.keys():
-            log_info = return_dict[c]
-            for i in log_info:
-                if type(i) == str:
-                    logger.info(i)
-                elif type(i) == dict:
-                    for n in i.keys():
-                        logger.info(f'-- {n}: {i[n]}')
-                        continue
-                elif type(i) == list:
-                    for f in i:
-                        logger.info(f"-- {f.name}")
-                        continue
+    manager = Manager()
+    return_dict = manager.dict()
+    p_umap(
+        partial(
+            run_pw_per_chromosome,
+            filtered_outdir=filtered_outdir,
+            PW_WINDOW_SIZE=PW_WINDOW_SIZE,
+            PW_STEP=PW_STEP,
+            PW_PDIST_CUTOFF=PW_PDIST_CUTOFF,
+            PW_REF=PW_REF,
+            PW_MIN_SEQ_LEN=PW_MIN_SEQ_LEN,
+            PW_PC_CUTOFF=PW_PC_CUTOFF,
+            PW_ZSCORE=PW_ZSCORE,
+            PW_EXCLUDE_LIST=PW_EXCLUDE_LIST,
+            PW_MISSING_CHAR=PW_MISSING_CHAR,
+            return_dict=return_dict,
+        ),
+        chrom_dirs,
+        **{"num_cpus": cpu_count},
+    )
+    # Log output information
+    for c in return_dict.keys():
+        log_info = return_dict[c]
+        for i in log_info:
+            if type(i) == str:
+                logger.info(i)
+            elif type(i) == dict:
+                for n in i.keys():
+                    logger.info(f'-- {n}: {i[n]}')
+                    continue
+            elif type(i) == list:
+                for f in i:
+                    logger.info(f"-- {f.name}")
+                    continue
 
 
     return None

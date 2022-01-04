@@ -14,7 +14,7 @@ def set_logger_level(WORKING_DIR, LOG_LEVEL):
     # Remove existing log file if present
     if os.path.exists(WORKING_DIR / 'logs/phybin.log'):
         os.remove(WORKING_DIR / 'logs/phybin.log')
-    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler = logging.FileHandler(WORKING_DIR / 'logs/phybin.log')
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()

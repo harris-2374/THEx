@@ -14,7 +14,7 @@ def set_logger_level(WORKING_DIR, LOG_LEVEL):
     # Remove existing log file if present
     if os.path.exists(WORKING_DIR / 'logs/topobin.log'):
         os.remove(WORKING_DIR / 'logs/topobin.log')
-    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler = logging.FileHandler(WORKING_DIR / 'logs/topobin.log')
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
@@ -61,14 +61,14 @@ def topobinner(TREEVIEWER_FN, UPDATED_TV_FILENAME, TOPOBIN_ROOTED, WORKING_DIR, 
     trees = df['NewickTree']
     topologies = dict()
     logger.info(f"{len(trees):,} trees to run")
-    # Update rootedness boolean value
+    # Set root boolean value
     if TOPOBIN_ROOTED == "Y":
-        TOPOBIN_ROOTED = True
-    else:
         TOPOBIN_ROOTED = False
+    else:
+        TOPOBIN_ROOTED = True
     # Bin Trees
     tqdm_text = "#" + "{}".format("run1").zfill(3)
-    with tqdm(total=len(trees), desc=tqdm_text) as pbar:
+    with tqdm(total=len(trees), desc=tqdm_text, ascii=True) as pbar:
         for n, t in enumerate(trees):
             # Check to see if tree is NoTree
             if t == "NoTree":
@@ -119,7 +119,7 @@ def topobinner(TREEVIEWER_FN, UPDATED_TV_FILENAME, TOPOBIN_ROOTED, WORKING_DIR, 
     # Update DataFrame TopologyID column with results
     overview_df = pd.DataFrame(
         {
-            "TopologyID": [("topo" + "{}".format(str(i)).zfill(zfillnum)) for i in range(1, len(topologies.keys())+1)],
+            "TopologyID": [("Tree" + "{}".format(str(i)).zfill(zfillnum)) for i in range(1, len(topologies.keys())+1)],
             "Count": [topologies[i]["count"] for i in topologies.keys()],
             "Rank": [i for i in range(1, len(topologies.keys())+1)],
         }
@@ -127,7 +127,7 @@ def topobinner(TREEVIEWER_FN, UPDATED_TV_FILENAME, TOPOBIN_ROOTED, WORKING_DIR, 
     topoCount = 1
     for topo in topologies.keys():
         idx = topologies[topo]['idx']
-        topoName = "topo" + "{}".format("1").zfill(zfillnum)
+        topoName = "Tree" + "{}".format(topoCount).zfill(zfillnum)
         for i in idx:
             df.at[i, 'TopologyID'] = topoName
             continue

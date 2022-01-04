@@ -1,6 +1,6 @@
 import logging
 import os
-from multiprocessing import Pool
+from multiprocessing import Pool, Value
 
 from Bio import AlignIO
 from Bio.Phylo.TreeConstruction import DistanceCalculator
@@ -39,7 +39,7 @@ def set_logger_level(WORKING_DIR, LOG_LEVEL):
     # Remove existing log file if present
     if os.path.exists(WORKING_DIR / 'logs/pdistance_calculator.log'):
         os.remove(WORKING_DIR / 'logs/pdistance_calculator.log')
-    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler = logging.FileHandler(WORKING_DIR / 'logs/pdistance_calculator.log')
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
@@ -97,7 +97,10 @@ def process_file(f, WINDOW_SIZE_INT, MISSING_CHAR, PDIST_THRESHOLD, PW_REF):
         }
         window_df = pd.DataFrame(window_contents)
         window_df.loc[window_df['Sample'].isin(drop_samples), 'Value'] = pd.NA
-        pdist_df = pd.concat([pdist_df, window_df])
+        try:
+            pdist_df = pd.concat([pdist_df, window_df])
+        except ValueError:
+            pass
         # Update window position
         start = win_start
         stop = win_stop
@@ -134,7 +137,10 @@ def pdistance_calculator(INPUT, pdistance_output_dir, PDIST_THRESHOLD, PW_REF, M
     # Start processes in the pool
     dfs = process_pool.starmap(process_file, [(f, WINDOW_SIZE_INT, MISSING_CHAR, PDIST_THRESHOLD, PW_REF) for f in files])
     # Concat dataframes to one dataframe
-    pdist_df = pd.concat(dfs, ignore_index=True)
+    try:
+        pdist_df = pd.concat(dfs, ignore_index=True)
+    except ValueError:
+        pass
     outfile = pdistance_output_dir / 'Signal_Tracer_input.tsv'
     pdist_df.reset_index(drop=True, inplace=True)
     pdist_df.to_csv(outfile, sep='\t', index=False)

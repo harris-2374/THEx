@@ -5,11 +5,13 @@ Python 3.8
 import logging
 import os
 import subprocess
-from multiprocessing import Process, Manager
+from functools import partial
+from multiprocessing import freeze_support, Manager
 from shlex import quote
 
-from tqdm import tqdm
 from pyfaidx import Fasta
+from p_tqdm import p_umap
+from tqdm.auto import tqdm
 
 from thexb.UTIL_checks import check_fasta
 from thexb.UTIL_parsers import divide_chrom_dirs_into_chunks
@@ -22,7 +24,7 @@ def set_logger_level(WORKING_DIR, LOG_LEVEL):
     # Remove existing log file if present
     if os.path.exists(WORKING_DIR / 'logs/trimal.log'):
         os.remove(WORKING_DIR / 'logs/trimal.log')
-    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler = logging.FileHandler(WORKING_DIR / 'logs/trimal.log')
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
@@ -84,13 +86,13 @@ def run_trimal_per_chrom(chrom, filtered_outdir, TRIMAL_THRESH, TRIMAL_MIN_LENGT
     filtered_chrom_outdir = filtered_outdir / f'{chrom.name}'
     filtered_chrom_outdir.mkdir(parents=True, exist_ok=True)
     # Run each window through Trimal
-    tqdm_text = "#" + f"{chrom.name}"
-    with tqdm(total=len(files), desc=tqdm_text) as pbar:
-        for f in files:
-            file_output_name = filtered_chrom_outdir / f'{f.name}'
-            subprocess.run([f'trimal -fasta -in {quote(f.as_posix())} -out {quote(file_output_name.as_posix())} -gapthreshold {TRIMAL_THRESH}'], shell=True, check=True, stderr=subprocess.DEVNULL)
-            pbar.update(1)
-            continue
+    # tqdm_text = "#" + f"{chrom.name}"
+    # with tqdm(total=len(files), desc=tqdm_text) as pbar:
+    for f in files:
+        file_output_name = filtered_chrom_outdir / f'{f.name}'
+        subprocess.run([f'trimal -fasta -in {quote(f.as_posix())} -out {quote(file_output_name.as_posix())} -gapthreshold {TRIMAL_THRESH}'], shell=True, check=True, stderr=subprocess.DEVNULL)
+        # pbar.update(1)
+        continue
     # Collect new filtered files
     filtered_files = [f for f in filtered_chrom_outdir.iterdir() if check_fasta(f)]
     # Filter out files with sequence lengths below TRIMAL_MIN_LENGTH
@@ -117,65 +119,45 @@ def trimal(unfiltered_indir, filtered_outdir, WORKING_DIR, TRIMAL_THRESH,
     """Entry point for Trimal that parses the input chromosome directories 
     into chunks equal to the number cores asked to be used."""
     set_logger_level(WORKING_DIR, LOG_LEVEL)
-
+    freeze_support()
     # Set cpu count for multiprocessing
     if type(MULTIPROCESS) == int:
         # Ensure not asking for more than available
-        assert int(MULTIPROCESS) <= os.cpu_count()
+        try:
+            assert int(MULTIPROCESS) <= os.cpu_count()
+        except AssertionError:
+            cpu_count = os.cpu_count()
         cpu_count = int(MULTIPROCESS)
     elif MULTIPROCESS == 'all':
         cpu_count = os.cpu_count()
     # Collect chromosome dirs and put into sets
     chrom_dirs = sorted([c for c in unfiltered_indir.iterdir() if c.is_dir()])
-    chrom_sets = list(divide_chrom_dirs_into_chunks(chrom_dirs, cpu_count))
     # Iterate through each chromosome dir
     manager = Manager()
     return_dict = manager.dict()
-    processes = []
-    try:
-        for cset in chrom_sets:
-            processes.clear()
-            for chrom in cset:
-                processes.append(
-                    Process(
-                        target=run_trimal_per_chrom, 
-                        args=(
-                            chrom,
-                            filtered_outdir,
-                            TRIMAL_THRESH, 
-                            TRIMAL_MIN_LENGTH,
-                            return_dict,
-                        ),
-                    )
-                )
-            for process in processes:
-                process.start()
-                logger.debug(f"Started process {process}")
-            for process in processes:
-                process.join()
-        
-        # Log output information
-        for c in return_dict.keys():
-            log_info, init_file_count, final_valid_file_count, final_fail_seq_len_file_count, final_dropped_file_count, empty_seq_logs = return_dict[c]
-            print()
-            logger.info(f"====================== {c.name} ======================")
-            logger.info("-------------------")
-            logger.info(f"Inital file count: {init_file_count}")
-            logger.info(f"Failed to minimum sequence length: {final_fail_seq_len_file_count}")
-            logger.info(f"No sequence remaining in file: {final_dropped_file_count}")
-            logger.info(f"Remaining valid files: {final_valid_file_count}")
-            logger.info("-------------------")
-            for i in log_info:
-                logger.info(i)
-            for j in empty_seq_logs:
-                logger.info(j)
-            logger.info(f"=====================================================")
-            
-        
-        return
-    except KeyboardInterrupt:
-        for p in processes:
-            if p.is_alive():
-                p.terminate()
-                logger.debug(f"Terminating process {p.pid}")
-        return
+    p_umap(
+        partial(
+            run_trimal_per_chrom,
+            filtered_outdir=filtered_outdir,
+            TRIMAL_THRESH=TRIMAL_THRESH,
+            TRIMAL_MIN_LENGTH=TRIMAL_MIN_LENGTH,
+            return_dict=return_dict,
+        ),
+        chrom_dirs,
+        **{"num_cpus": cpu_count},
+    )
+    for c in return_dict.keys():
+        log_info, init_file_count, final_valid_file_count, final_fail_seq_len_file_count, final_dropped_file_count, empty_seq_logs = return_dict[c]
+        logger.info("-------------------")
+        logger.info(f"Sequence: {c.name}")
+        logger.info(f"Inital file count: {init_file_count}")
+        logger.info(f"Failed to minimum sequence length: {final_fail_seq_len_file_count}")
+        logger.info(f"No sequence remaining in file: {final_dropped_file_count}")
+        logger.info(f"Remaining valid files: {final_valid_file_count}")
+        logger.info("-------------------")
+        for i in log_info:
+            logger.info(i)
+        for j in empty_seq_logs:
+            logger.info(j)
+        logger.info(f"=====================================================")
+    return

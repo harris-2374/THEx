@@ -3,14 +3,12 @@ import os
 import shutil
 import subprocess
 import math
-from multiprocessing import Process, Manager, freeze_support
+from multiprocessing import Manager, freeze_support
 from shlex import quote
+from functools import partial
 
-from tqdm import tqdm
+from p_tqdm import p_umap
 import pandas as pd
-import colorama
-# colorama.deinit()
-colorama.init(strip=True)
 
 from thexb.UTIL_checks import check_fasta
 
@@ -18,7 +16,7 @@ from thexb.UTIL_checks import check_fasta
 logger = logging.getLogger(__name__)
 
 def set_logger_level(WORKING_DIR, LOG_LEVEL):
-    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler = logging.FileHandler(WORKING_DIR / 'logs/iq_tree.log')
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
@@ -105,7 +103,7 @@ def create_TreeViewer_input(filtered_tree_outdir, treeViewer_filename):
 ############################### Main Function ################################
 def run_iqtree(chromosome, filtered_metadata_outdir, filtered_tree_outdir, IQT_MODEL, IQT_BOOTSTRAP, IQT_CORES, return_dict):
     """For each file in a given chromosome directory, run it through IQ-TREE with provided parameters"""
-    metadata_suffixes = ['.bionj', '.ckp.gz', '.log', '.mldist', '.contree', '.iqtree', '.splits.nex', '.lsf', '.output', '.phy']
+    metadata_suffixes = ['.bionj', '.ckp.gz', '.log', '.mldist', '.treefile', '.iqtree', '.splits.nex', '.lsf', '.output', '.phy']
     chrom_files = [f for f in chromosome.iterdir() if check_fasta(f)]
     dropped_files = [f for f in chromosome.iterdir() if "-DROPPED" in f.name]
     if len(dropped_files) == len(chrom_files):
@@ -116,77 +114,66 @@ def run_iqtree(chromosome, filtered_metadata_outdir, filtered_tree_outdir, IQT_M
     skipped_files = list()
     dropped_total = 0
     # Iterate through each file in the chromosome dir
-    tqdm_text = "#" + f"{chromosome.name}"
-    with tqdm(total=len(chrom_files), desc=tqdm_text) as pbar:
-        for f in chrom_files:
-            if all_dropped:
-                skipped_files.append(f)
-                chrom_dir = filtered_tree_outdir / chromosome.stem
-                filestem = f.name.strip("-DROPPED.fasta")
-                tree_cf = chrom_dir / f"{filestem}-DROPPED.treefile"
-                chrom_dir.mkdir(parents=True, exist_ok=True)
-                with open(tree_cf, 'w') as oh:
-                    oh.write("WINDOW DROPPED")
-                    pbar.update(1)
-                    continue
-            elif "-DROPPED" in f.name:
-                dropped_total += 1
-                pbar.update(1)
+    for f in chrom_files:
+        if all_dropped:
+            skipped_files.append(f)
+            chrom_dir = filtered_tree_outdir / chromosome.stem
+            filestem = f.name.strip("-DROPPED.fasta")
+            tree_cf = chrom_dir / f"{filestem}-DROPPED.contree"
+            chrom_dir.mkdir(parents=True, exist_ok=True)
+            with open(tree_cf, 'w') as oh:
+                oh.write("WINDOW DROPPED")
                 continue
-            # Run file through IQ-TREE
-            try:
-                output_prefix = filtered_tree_outdir / chromosome.name / f.stem
-                # -nt AUTO picks best number of threads to use
-                subprocess.run([f'iqtree -nt {IQT_CORES} -s {quote(f.as_posix())} -m {quote(IQT_MODEL)} -bb {IQT_BOOTSTRAP} -pre {output_prefix} --quiet'], stderr=subprocess.DEVNULL, shell=True, check=True)
-                pbar.update(1)
+        elif "-DROPPED" in f.name:
+            dropped_total += 1
+            chrom_dir = filtered_tree_outdir / chromosome.stem
+            filestem = f.name.strip("-DROPPED.fasta")
+            tree_cf = chrom_dir / f"{filestem}-DROPPED.contree"
+            chrom_dir.mkdir(parents=True, exist_ok=True)
+            with open(tree_cf, 'w') as oh:
+                oh.write("WINDOW DROPPED")
                 continue
-            except:
-                skipped_files.append(f)
-                chrom_dir = filtered_tree_outdir / chromosome.stem
-                filestem = f.name.strip("-DROPPED.fasta")
-                tree_cf = chrom_dir / f"{filestem}-DROPPED.treefile"
-                chrom_dir.mkdir(parents=True, exist_ok=True)
-                with open(tree_cf, 'w') as oh:
-                    oh.write("WINDOW DROPPED")
-                    pbar.update(1)
-                    continue
+        # Run file through IQ-TREE
+        try:
+            output_prefix = filtered_tree_outdir / chromosome.name / f.stem
+            # -nt AUTO picks best number of threads to use
+            subprocess.run([f'iqtree -nt {IQT_CORES} -s {quote(f.as_posix())} -m {quote(IQT_MODEL)} -bb {IQT_BOOTSTRAP} -pre {output_prefix} --quiet'], stderr=subprocess.DEVNULL, shell=True, check=True)
+            continue
+        except:
+            skipped_files.append(f)
+            chrom_dir = filtered_tree_outdir / chromosome.stem
+            filestem = f.name.strip("-DROPPED.fasta")
+            tree_cf = chrom_dir / f"{filestem}-DROPPED.contree"
+            chrom_dir.mkdir(parents=True, exist_ok=True)
+            with open(tree_cf, 'w') as oh:
+                oh.write("WINDOW DROPPED")
+                continue
     # Move IQ-TREE output to respective tree + metadata directories
     # NOTE: Not sure why, but program stalls out if I try to organize as I create files
     filtered_chromosome_dir = filtered_tree_outdir / chromosome.stem
     filtered_chromosome_files = [f for f in filtered_chromosome_dir.iterdir()]
-    tqdm_text2 = "#" + f"{chromosome.name}-filter"
-    with tqdm(total=len(filtered_chromosome_files), desc=tqdm_text2) as pbar2:
-        for iqf in filtered_chromosome_files:
-            if iqf.suffix == '.fasta':
-                pbar2.update(1)
+    for iqf in filtered_chromosome_files:
+        if iqf.suffix == '.fasta':
+            continue
+        elif iqf.suffix == '.contree':
+                logger.debug(f"Tree file: {iqf.name}")
+                chrom_dir = filtered_tree_outdir / chromosome.stem
+                chrom_dir.mkdir(parents=True, exist_ok=True)
+                new_filehandle = chrom_dir / iqf.name
+                shutil.move(iqf, new_filehandle)
                 continue
-            elif iqf.suffix == '.treefile':
-                    logger.debug(f"Tree file: {iqf.name}")
-                    chrom_dir = filtered_tree_outdir / chromosome.stem
+        else:
+            # Check metadata suffixes
+            for sufx in metadata_suffixes:
+                if sufx in str(iqf):
+                    logger.debug(f"Metadata file: {iqf.name}")
+                    chrom_dir = filtered_metadata_outdir / chromosome.stem
                     chrom_dir.mkdir(parents=True, exist_ok=True)
                     new_filehandle = chrom_dir / iqf.name
                     shutil.move(iqf, new_filehandle)
-                    pbar2.update(1)
                     continue
-            else:
-                # Check metadata suffixes
-                for sufx in metadata_suffixes:
-                    if sufx in str(iqf):
-                        logger.debug(f"Metadata file: {iqf.name}")
-                        chrom_dir = filtered_metadata_outdir / chromosome.stem
-                        chrom_dir.mkdir(parents=True, exist_ok=True)
-                        new_filehandle = chrom_dir / iqf.name
-                        shutil.move(iqf, new_filehandle)
-                        # try:
-                            
-                        # except FileNotFoundError:
-                        #     msg = f"{iqf.name} not found"
-                        #     raise FileNotFoundError(msg)
-                        pbar2.update(1)
-                        continue
-                    else:
-                        pbar2.update(1)
-                        continue
+                else:
+                    continue
     # Collect log info
     log_info = [
         f"========== {chromosome.name} ==========",
@@ -202,7 +189,6 @@ def run_iqtree(chromosome, filtered_metadata_outdir, filtered_tree_outdir, IQT_M
 def iq_tree(filtered_indir, filtered_metadata_outdir, filtered_tree_outdir, treeViewer_filename, 
             WORKING_DIR, IQT_MODEL, IQT_BOOTSTRAP, IQT_CORES, MULTIPROCESS, LOG_LEVEL):
     """Iterate through each trimal filetered chromosome directory and filter windows based on missingness."""
-        
     set_logger_level(WORKING_DIR, LOG_LEVEL)  # Setup log file level
     freeze_support() # For Windows support
     # Set cpu count for multiprocessing
@@ -233,31 +219,23 @@ def iq_tree(filtered_indir, filtered_metadata_outdir, filtered_tree_outdir, tree
 
     # Collect Chromosome firs
     chrom_dirs = sorted([f for f in filtered_indir.iterdir() if f.is_dir()])
-    chrom_sets = list(divide_input_into_cpu_size_chunks(chrom_dirs, cpu_count))
 
     # Run all files through IQ-Tree
-    processes = []
     manager = Manager()
     return_dict = manager.dict()
-    for cset in chrom_sets:
-        processes.clear()
-        for chromosome in cset:
-            iqtree_args = [
-                chromosome,
-                filtered_metadata_outdir,
-                filtered_tree_outdir,
-                IQT_MODEL,
-                IQT_BOOTSTRAP,
-                IQT_CORES,
-                return_dict,
-            ]
-            processes.append(Process(target=run_iqtree, args=iqtree_args))
-
-        for process in processes:
-            process.start()
-
-        for process in processes:
-            process.join()
+    p_umap(
+        partial(
+            run_iqtree,
+            filtered_metadata_outdir=filtered_metadata_outdir,
+            filtered_tree_outdir=filtered_tree_outdir,
+            IQT_MODEL=IQT_MODEL,
+            IQT_BOOTSTRAP=IQT_BOOTSTRAP,
+            IQT_CORES=IQT_CORES,
+            return_dict=return_dict,
+        ),
+        chrom_dirs,
+        **{"num_cpus": cpu_count},
+    )
     # Update all .treefile removing heterotachy info and secondary tree's 
     update_tree_files(filtered_tree_outdir)
     # Create initial input file for Tree Viewer

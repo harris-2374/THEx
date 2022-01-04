@@ -22,7 +22,7 @@ from thexb.UTIL_checks import check_fasta
 ############################### Set up logger #################################
 logger = logging.getLogger(__name__)
 def set_logger_level(WORKING_DIR, LOG_LEVEL):
-    formatter = logging.Formatter('%(levelname)s: %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler = logging.FileHandler(WORKING_DIR / 'logs/pairwise_estimator.log')
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
@@ -173,15 +173,15 @@ def pairwise_estimator(filtered_indir, PW_REF, PW_EST_PERCENT_CHROM, WORKING_DIR
     logger.info("-----------------")
     logger.info(pformat(avg_p_distance))
     logger.info("-----------------\n")
-    logger.info("p-distance Median:")
+    logger.info("Median p-distance:")
     logger.info("-----------------")
     logger.info(pformat(pdist_median))
     logger.info("-----------------\n")
     # Output suggested input parameters
     suggested_pdist, zscore, suggest_cov = return_suggested_parameters(avg_coverage, pdist_median)
     logger.info("Suggest input parameters:")
-    logger.info(f"Note! - Suggested parameters are calculated as (maximum sampled coverage * 0.9), (maximum sampled p-distance * 1.1)")
-    logger.info(f"Note! - Suggested z-score is calculated based on maximum and median (rather than mean) suggested sampled p-distance")
+    logger.info(f"Note! - Suggested parameters are calculated as (maximum_sampled_coverage * 0.9), (maximum_sampled_p-distance * 1.1)")
+    logger.info(f"Note! - Suggested Z-score is calculated as (max_median_pdist * 1.1)")
     logger.info("-----------------")
     logger.info(f"max_pDistance_cutoff = {suggested_pdist}")
     logger.info(f"Zscore = {zscore}")

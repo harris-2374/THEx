@@ -3598,6 +3598,9 @@ def whole_genome_plot(
     # Read in json data
     df = pd.read_json(tv_input_json)
     chromosome_df = pd.read_json(chromosome_lengths)
+    # Filter out data not within selected range
+    df = df.sort_values(by=["Chromosome", "Window", "TopologyID"])
+    df = df.reset_index(drop=True)
     # Set up graph config
     if (not pixel_height) or (not pixel_width):
         # pixel_width, pixel_height = 1500, 1123
