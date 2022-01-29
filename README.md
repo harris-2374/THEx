@@ -6,7 +6,7 @@
 Two of the main dependencies required for the THExBuilder's Tree Viewer pipeline are not supported on Windows. Due to this limitation, THEx for Windows is only deployed with the main THEx application.
 
 ## Browser Support
-THEx is supported by most major broswers (Google Chrome, Safari, Firefox, etc.) except Internet Explorer.  
+THEx is supported by most major browsers (Google Chrome, Safari, Firefox, etc.) except Internet Explorer.  
 
 
 #  Conda Installation
@@ -40,7 +40,7 @@ Once you hit enter, it may take a moment to start up but in the console you shou
 
 You can click or copy/paste this address into your browser and the homepage should load up. 
 
-Now that you are on the homepage for THEx, you are ready to begin exploring! If it is your first time using THEx, it's reccomended to take a moment and look over the Docs to get a more detailed breakdown of each dashboard, as well as THEx's built-in command line suite _THExBuilder_. 
+Now that you are on the homepage for THEx, you are ready to begin exploring! If it is your first time using THEx, it's recommended to take a moment and look over the Docs to get a more detailed breakdown of each dashboard, as well as THEx's built-in command line suite _THExBuilder_. 
 
 
 # THExBuilder
