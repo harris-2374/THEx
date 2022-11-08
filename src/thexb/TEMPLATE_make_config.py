@@ -1,7 +1,8 @@
 def config_template():
-    file_contents = """[Input Files]
+    file_contents = """[General]
 multi_alignment_dir = input/dir/with/chromosomes/
-TreeViewer_file_name = ./THExBuilderOutput/TreeViewer_input_file.xlsx
+TreeViewer_file_name = TreeViewer_input_file.xlsx
+outdir = /example/output/directory
 
 [Fasta Windower]
 # Give as 100bp/kb/mb
@@ -29,10 +30,10 @@ missing_char = N
 [IQ-TREE]
 model = GTR*H4
 bootstrap = 1000
-cores_per_job = 4
+cores_per_job = AUTO
 
 [Topobinner]
-rooted_trees = False
+rooted_trees = N
 
 [Logging]
 level = INFO

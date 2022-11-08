@@ -36,18 +36,21 @@ class HelpDesc():
         return msg
 
     def pdistance(self):
-        msg="Calculate p-distance for one or more multiple-sequnce alignment fasta files. Multiple files must be in a single directory and the directory path is provided instead of a single file path. Assumes file names are chromosome names only (i.e. chr1.fasta, chr2.fasta)."
+        msg="Calculate p-distance for one or more multiple-sequence alignment fasta files."
         return msg
     
     def pdistance_threshold(self):
-        msg = "Missing data threshold for single sample p-distance calculation. If sample's missing data frequency is above threshold, all samples are given nan result.  (default: 0.75)"
+        msg = "Maximum frequency of missing data per-window. (default: 0.75)"
+        return msg
+
+    def pdistance_filename(self):
+        msg = "File name for p-distance calculator. (default: SignalTracer_input.tsv)"
         return msg
 
     def reference(self):
-        msg="Reference sample for p-distance calculation or p-distance filtration step of the Tree Viewer pipeline"
+        msg="Reference sample for the --pdistance, --pw_estimator, and --pw_filter commands."
         return msg
 
-    # Side tools
     def parse_treeviewer(self):
         msg="Creates individual files for each chromosome of a Tree Viewer input file - (best for large genomes with small window sizes)"
         return msg
@@ -61,7 +64,7 @@ class HelpDesc():
         return msg
 
     def config(self):
-        msg="Pathway to configuration file for Tree Viewer pipeline (reccomended for ease of replicability)"
+        msg="Pathway to configuration file for Tree Viewer pipeline (*recommended approach*)"
         return msg
 
     def input(self):
@@ -81,7 +84,7 @@ class HelpDesc():
         return msg
 
     def window_size(self):
-        msg='Window size [bp/kb/mb] (default: 100kb)'
+        msg='Window size [bp/kb/mb/gb] (default: 100kb)'
         return msg
 
     def trimal_gap_threshold(self):
@@ -119,6 +122,10 @@ class HelpDesc():
     def pw_missing_char(self):
         msg='Character used to represent masked sequence (default: N)'
         return msg
+    
+    def pw_exclude(self):
+        msg='List of samples to exclude when running pairwise filter (default: Reference)'
+        return msg
 
     def pwe_percent_chrom(self):
         msg='Percentage of each chromosome to randomly draw windows (default: 0.1)'
@@ -129,7 +136,7 @@ class HelpDesc():
         return msg
 
     def iqtree_bootstrap(self):
-        msg='Number of bootstrap replicated to pass to IQ-Tree (default: 1000)'
+        msg='Number of bootstrap replicated to pass to IQ-Tree. IQ-Tree requires a minimum of 1000 replicates. (default: 1000)'
         return msg
     
     def iqtree_cpu_cores(self):
@@ -153,14 +160,21 @@ class HelpDesc():
         return msg
 
     def missing_character(self):
-        msg = "Missing base character (default: N)"
+        msg = "Missing data character used to filter samples in --pdistance command (default: N)"
         return msg
-
 
     def rootTV(self):
         msg = "Root Newick trees in Tree Viewer input file. List multiple samples with a space between them. (i.e., cat1 cat2 cat3)"
         return msg
 
     def tv_file_name(self):
-        msg = "File path + name of Tree Viewer input file (default: ./THExBuilderOutput/TreeViewer_input_file.xlsx"
+        msg = "Name of Tree Viewer input file produced at the end of the Tree Viewer pipeline (default: TreeViewer_input_file.xlsx)"
+        return msg
+
+    def trimal_dropwindows(self):
+        msg="Drop windows missing sample sequence (default: True)"
+        return msg
+
+    def ignore_missing(self):
+        msg="Ignore sites with missing data when calculating p-distance (default: True)"
         return msg

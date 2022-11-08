@@ -142,7 +142,7 @@ def whole_genome_line(
         rows=len(chromosomes),
         cols=1,
         x_title="Position",
-        y_title="Edit Me!",
+        y_title="value",
         row_titles=chromosomes,
         row_heights=[2]*len(chromosomes),
     )
@@ -207,7 +207,7 @@ def whole_genome_line(
     fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
     # Rotate chromosome names to 0-degrees
     for annotation in fig['layout']['annotations']:
-        if annotation['text'] == "Edit Me!":
+        if annotation['text'] == "value":
             continue
         annotation['textangle']=0
         annotation['align']="center"
@@ -310,7 +310,7 @@ def whole_genome_scatter(
     fig.update_traces(marker=dict(size=float(marker_width)))
     # Rotate chromosome names to 0-degrees
     for annotation in fig['layout']['annotations']:
-        if annotation['text'] == "Edit Me!":
+        if annotation['text'] == "value":
             continue
         annotation['textangle']=0
         annotation['align']="center"

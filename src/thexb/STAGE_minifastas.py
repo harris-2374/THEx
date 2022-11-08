@@ -13,13 +13,10 @@ import textwrap
 from multiprocessing import freeze_support
 from functools import partial
 # Dependencies
-from tqdm.auto import tqdm
 from pyfaidx import Fasta
 from p_tqdm import p_umap
 # THEx imports
 from thexb.UTIL_checks import check_fasta
-from thexb.UTIL_converters import convert_window_size_to_int
-from thexb.UTIL_parsers import divide_chrom_dirs_into_chunks
 
 ############################### Set up logger #################################
 logger = logging.getLogger(__name__)
@@ -36,36 +33,42 @@ def set_logger(WORKING_DIR, LOG_LEVEL):
     return logger
 
 ############################### Helper Function ################################
+def get_seq(sample_seq_dict, header, start_pos, end_pos):
+    return textwrap.wrap("".join(list(sample_seq_dict[str(header)][start_pos:end_pos])), 80)
+
+
 def parse_chromosome_into_windows(f, WORKING_DIR, WINDOW_SIZE_INT):
     """Split each chromosome file (or just file) into n-bp windows"""
-    chromosome = str(f.stem)
+    chromosome = str(f.stem).replace(".fasta", "").replace(".fa", "").replace(".fna", "").replace(".fas", "")
     try:
-        with Fasta(f.as_posix()) as fasta_file:
+        with Fasta(f) as fasta_file:
             headers = fasta_file.keys()
             windowed_outdir = WORKING_DIR / 'windowed_fastas' / f"{chromosome}"
             windowed_outdir.mkdir(parents=True, exist_ok=True)
             flag = True
             for header in list(headers):
                 try:
-                    sample_seq_df = {str(header): list(fasta_file[str(header)][:].seq)}
+                    sample_seq_dict = {str(header): list(fasta_file[str(header)][:].seq)}
                 except KeyError:
                     break
-                number_of_out_seqs = (len(sample_seq_df[str(header)]) // WINDOW_SIZE_INT + 1)
-                start_position = 1
-                end_position = WINDOW_SIZE_INT
+                number_of_out_seqs = (len(sample_seq_dict[str(header)]) // WINDOW_SIZE_INT + 1)
+                start_pos = 0
+                end_pos = WINDOW_SIZE_INT
                 for _ in range(number_of_out_seqs):
-                    current_file_path = windowed_outdir / f"{chromosome}_{start_position}_{end_position}.fasta"
+                    # current_file_path = windowed_outdir / f"chr-{chromosome}-s-{(start_pos + 1)}-e-{end_pos}.fasta"
+                    clean_chromosome_name = chromosome.replace("_", "-")
+                    current_file_path = windowed_outdir / f"{clean_chromosome_name}_{(start_pos + 1)}_{end_pos}.fasta"
                     if flag:
                         if current_file_path.is_file():
                             os.remove(current_file_path)
                         else:
                             pass
                     with open(current_file_path, 'a') as current_file: 
-                        seq = textwrap.wrap("".join(list(sample_seq_df[str(header)][start_position:end_position])), 80)
+                        seq = get_seq(sample_seq_dict, header, start_pos, end_pos)
                         current_file.write(">{}\n".format(header))
                         current_file.write("{}\n".format("\n".join(seq)))
-                        start_position += WINDOW_SIZE_INT
-                        end_position += WINDOW_SIZE_INT
+                        start_pos += WINDOW_SIZE_INT
+                        end_pos += WINDOW_SIZE_INT
                 flag = False
     except:
         logger.warning(f"Run failed with file {chromosome}")

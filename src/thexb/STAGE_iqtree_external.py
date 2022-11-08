@@ -21,22 +21,20 @@ def set_logger_level(WORKING_DIR, LOG_LEVEL):
     return logger
 
 ############################## Helper Functions ###############################
-def remove_heterotachy_info(l, tf):
-    if "[" not in l:
-        return l
-    else:
-        open_brackets = [i for i, x in enumerate(l) if x == "["]
-        close_brackets = [i for i, x in enumerate(l) if x == "]"]
-        
+def remove_heterotachy_info(l):
+    open_brackets = [i for i, x in enumerate(l) if x == "["]
+    close_brackets = [i for i, x in enumerate(l) if x == "]"]
+    if open_brackets and close_brackets:
         final_string = f'{l[:open_brackets[0]]}'
-
         for ob, cb in zip(open_brackets[1:], close_brackets[:-1]):
             final_string += l[cb+1:ob]
         final_string += l[close_brackets[-1]+1:]
         return final_string
+    else:
+        return l
 
 
-def create_TreeViewer_input(filtered_tree_outdir, treeViewer_filename, IQT_OUTGROUP):
+def create_TreeViewer_input(filtered_tree_outdir, treeViewer_filename):
     treeviewer_df = pd.DataFrame(columns=['Chromosome', 'Window', 'NewickTree'])
     chrom_dirs = [c for c in filtered_tree_outdir.iterdir() if c.is_dir()]
     if len(chrom_dirs) == 0:
@@ -50,16 +48,18 @@ def create_TreeViewer_input(filtered_tree_outdir, treeViewer_filename, IQT_OUTGR
             chrom_files = [f for f in chrom.iterdir() if f.is_file()]
             for f in chrom_files:
                 if "-DROPPED" in f.name:
-                    chrom, _, end = f.stem.strip('-DROPPED.fasta').split("_")
+                    chrom = f.stem.strip('-DROPPED.fasta').split("_")[0]
+                    end = f.stem.strip('-DROPPED.fasta').split("_")[-1]
                     treeviewer_df.at[idx, 'Chromosome'] = str(chrom)
                     treeviewer_df.at[idx, 'Window'] = int(end)
                     treeviewer_df.at[idx, 'NewickTree'] = str("NoTree")
                     idx += 1
                     continue
                 else:
-                    chrom, _, end = f.stem.strip('.fasta').split("_")
+                    chrom = f.stem.strip('-DROPPED.fasta').split("_")[0]
+                    end = f.stem.strip('-DROPPED.fasta').split("_")[-1]
                     raw_tree = open(f).readlines()[0].strip()
-                    trimmed_tree = remove_heterotachy_info(raw_tree, f)
+                    trimmed_tree = remove_heterotachy_info(raw_tree)
                     try:
                         tree = Tree(trimmed_tree)
                     except:
@@ -73,16 +73,18 @@ def create_TreeViewer_input(filtered_tree_outdir, treeViewer_filename, IQT_OUTGR
         chrom_files = [f for f in filtered_tree_outdir.iterdir() if f.is_file()]
         for f in chrom_files:
             if "-DROPPED" in f.name:
-                chrom, _, end = f.stem.strip('-DROPPED.fasta').split("_")
+                chrom = f.stem.strip('-DROPPED.fasta').split("_")[0]
+                end = f.stem.strip('-DROPPED.fasta').split("_")[-1]
                 treeviewer_df.at[idx, 'Chromosome'] = str(chrom)
                 treeviewer_df.at[idx, 'Window'] = int(end)
                 treeviewer_df.at[idx, 'NewickTree'] = str("NoTree")
                 idx += 1
                 continue
             else:
-                chrom, _, end = f.stem.strip('.fasta').split("_")
+                chrom = f.stem.strip('-DROPPED.fasta').split("_")[0]
+                end = f.stem.strip('-DROPPED.fasta').split("_")[-1]
                 raw_tree = open(f).readlines()[0].strip()
-                trimmed_tree = remove_heterotachy_info(raw_tree, f)
+                trimmed_tree = remove_heterotachy_info(raw_tree)
                 try:
                     tree = Tree(trimmed_tree)
                 except:
@@ -99,9 +101,9 @@ def create_TreeViewer_input(filtered_tree_outdir, treeViewer_filename, IQT_OUTGR
 
 
 ############################### Main Function ################################
-def iq_tree_external(EXTERNAL_PATH, treeViewer_filename, WORKING_DIR, IQT_OUTGROUP, LOG_LEVEL):
+def iq_tree_external(EXTERNAL_PATH, treeViewer_filename, WORKING_DIR, LOG_LEVEL):
     """Iterate through each trimal filetered chromosome directory and filter windows based on missingness."""
     set_logger_level(WORKING_DIR, LOG_LEVEL)  # Setup log file level
-    create_TreeViewer_input(EXTERNAL_PATH, treeViewer_filename, IQT_OUTGROUP)
+    create_TreeViewer_input(EXTERNAL_PATH, treeViewer_filename)
     return
 

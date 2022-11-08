@@ -6,14 +6,14 @@ import argparse
 from pathlib import Path
 
 from gevent import monkey
+from gevent.pywsgi import WSGIServer
 monkey.patch_all()
 
 import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output
-from gevent.pywsgi import WSGIServer
 from thex.app import app, server
-from thex.apps import homepage
+from thex.apps.homepage import layout
 from thex.apps.tree_viewer import tv_layout
 from thex.apps.signal_tracer import signalTracer_layout
 from thex.apps.docs import docs_layout
@@ -29,7 +29,7 @@ app.layout = html.Div([
               [Input('url', 'pathname')])
 def display_page(pathname):
     if pathname == '/':
-        return homepage.layout
+        return layout()
     elif pathname == '/apps/signal_tracer':
         return signalTracer_layout()
     elif pathname == '/apps/tree_viewer':
@@ -47,25 +47,24 @@ def main():
         type=str,
         action='store',
         default='127.0.0.1',
-        help="Host address",
+        help="Host address (default: 127.0.0.1)",
     )
     parser.add_argument(
         '--port',
         type=int,
         action='store',
         default=8050,
-        help='Port number',
-    )
-    parser.add_argument(
-        '--dev',
-        action='store_true',
-        default=False,
-        help='Run in development mode',
+        help='Port number (default: 8050)',
     )
     args = parser.parse_args()
-    if args.dev:
-        app.run_server(debug=True, port=args.port, host=args.host)
-    else:
-        print(f"Tree House Explorer running on http://{args.host}:{args.port}/")
-        http_server = WSGIServer((args.host, args.port), application=server, log=None)
-        http_server.serve_forever()
+    print(f"Tree House Explorer running on http://{args.host}:{args.port}/")
+    geventOpt = {
+        'GATEWAY_INTERFACE': 'CGI/1.1',
+        'SCRIPT_NAME': '',
+        'wsgi.version': (1, 0),
+        'wsgi.multithread': True,
+        'wsgi.multiprocess': True,
+        'wsgi.run_once': False
+    }
+    http_server = WSGIServer((args.host, args.port), application=server, log=None, environ=geventOpt)
+    http_server.serve_forever()

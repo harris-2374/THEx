@@ -180,8 +180,9 @@ def pairwise_estimator(filtered_indir, PW_REF, PW_EST_PERCENT_CHROM, WORKING_DIR
     # Output suggested input parameters
     suggested_pdist, zscore, suggest_cov = return_suggested_parameters(avg_coverage, pdist_median)
     logger.info("Suggest input parameters:")
-    logger.info(f"Note! - Suggested parameters are calculated as (maximum_sampled_coverage * 0.9), (maximum_sampled_p-distance * 1.1)")
-    logger.info(f"Note! - Suggested Z-score is calculated as (max_median_pdist * 1.1)")
+    logger.info(f"Note: Estimates are conservative - they are not guaranteed to be the optimal settings")
+    logger.info(f"Note: Suggested parameters are calculated as (maximum_sampled_coverage * 0.9), (maximum_sampled_p-distance * 1.1)")
+    logger.info(f"Note: Suggested Z-score is calculated as (max_median_pdist * 1.1)")
     logger.info("-----------------")
     logger.info(f"max_pDistance_cutoff = {suggested_pdist}")
     logger.info(f"Zscore = {zscore}")

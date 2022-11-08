@@ -39,7 +39,7 @@ def WriteOUT(outfile, output):
 def FormatDictionaryOfNucleotideSeqsToFasta(d, Ns):
     o = ''
     for k in Ns:
-        o += '>%s\n%s\n' % (k, "\n".join(textwrap.wrap(d[k], width=60)))
+        o += '>%s\n%s\n' % (k, "\n".join(textwrap.wrap(d[k], width=80)))
     return o
 
 
@@ -64,7 +64,11 @@ def CalculatePercentAACoverageForEachSequenceInDictionary(newseqs, lenseqs, PW_M
         for char in newseqs[n]:
             if char != '-' and char != PW_MISSING_CHAR and char.isalpha():
                 num_valid_bases += 1.0
-        perccov[n] = float(num_valid_bases/lenseqs)  # NOTE: Keeping as float to match other input variable data types
+        try:
+            perccov[n] = float(num_valid_bases/lenseqs)  # NOTE: Keeping as float to match other input variable data types
+        except ZeroDivisionError:
+            print(num_valid_bases, lenseqs)
+            exit(1)
     return perccov
 
 
@@ -89,7 +93,8 @@ def MaskAlignedSeqsUsingStartAndEndCoordinates(seqs, start, end, PW_MISSING_CHAR
 
 def RecordValueIfGreaterThanTwoStandardDevsAwayFromMean(median, stddev, PW_ZSCORE, PW_PDIST_CUTOFF, pdist, i, PW_WINDOW_SIZE, start, end):
     for n in pdist.keys():
-        if pdist[n] > (median+(PW_ZSCORE*stddev)) and pdist[n] > PW_PDIST_CUTOFF: # value must be significantly different according to PW_ZSCORE and also greater than p-distance cutoff.
+        # value must be significantly different according to PW_ZSCORE and also greater than p-distance cutoff.
+        if pdist[n] > (median+(PW_ZSCORE*stddev)) and pdist[n] > PW_PDIST_CUTOFF:
             start[n] = start.get(n, []) + [i+1]
             end[n] = end.get(n, []) + [i+PW_WINDOW_SIZE]
     return start, end
@@ -116,7 +121,7 @@ def StandardDeviation(mylist):
 def Median(mylist):
     sorts = sorted(mylist)
     length = len(sorts)
-    if length % 2 != 0:
+    if length % 2 == 0:
         return ((sorts[int(length / 2)] + sorts[int(length / 2 - 1)]) / 2.0)
     else:
         return sorts[int(length / 2)]
@@ -153,7 +158,7 @@ def CalculatePairwiseDeletionDistanceForAlignedSeqsComparedToRefSeq(seqs, PW_REF
     return pdist, xlist
 
 
-def SplitAlignedSeqsIntoWindows(seqs, numindivs, lenseqs, PW_WINDOW_SIZE, PW_STEP, PW_MISSING_CHAR, PW_REF, PW_ZSCORE, PW_PDIST_CUTOFF):
+def SplitAlignedSeqsIntoWindows(seqs, lenseqs, PW_WINDOW_SIZE, PW_STEP, PW_MISSING_CHAR, PW_REF, PW_ZSCORE, PW_PDIST_CUTOFF, PW_EXCLUDE_LIST):
     """Splits sequences into sub windows, calculates p-distance, removes samples from exlusion list,
     records if sub-window has a p-dist greater than X stdevs from mean, 
     then masks the sequences where p-distance is too high for a given taxa
@@ -164,16 +169,13 @@ def SplitAlignedSeqsIntoWindows(seqs, numindivs, lenseqs, PW_WINDOW_SIZE, PW_STE
 
     # NOTE: Check to ensure reference sample is in file
     # Required for calculating p-distance
-    try:
-        assert(PW_REF in seqs.keys())
-    except AssertionError:
-        raise AssertionError("Reference sample not in window")
-    
+    if PW_REF in list(seqs.keys()) == False:
+        return "NoReference"
     for i in range(0, lenseqs, PW_STEP):
         window = {}
         for n in seqs.keys(): # cut one window for all aligned sequences in seqs.
             window[n] = seqs[n][i:(i+PW_WINDOW_SIZE)]
-        pdist, xlist = CalculatePairwiseDeletionDistanceForAlignedSeqsComparedToRefSeq(window, PW_REF, PW_REF, PW_MISSING_CHAR)
+        pdist, xlist = CalculatePairwiseDeletionDistanceForAlignedSeqsComparedToRefSeq(window, PW_REF, PW_EXCLUDE_LIST, PW_MISSING_CHAR)
         redpdist = MakeNewReducedListAndExcludeKeyValues(pdist, xlist)
 
         # Skip windows that have 1 or 0 samples
@@ -228,13 +230,16 @@ def run_pw_per_chromosome(
     init_valid_files = [f.stem for f in files if '-DROPPED' not in f.name]
     filtered_chrom_outdir = filtered_outdir / f'{chrom.name}'
     filtered_chrom_outdir.mkdir(parents=True, exist_ok=True)
+    from pprint import pprint as print
+    print(chrom) if chrom.name == "test_output2/trimal_filtered_windows/chrY_random_Un_scaffold_91" else None
+    # print(files)
 
     countshit = dict()
-    countperccovcutoff = 0
-    countemptyalignments = 0
-
+    countperccovcutoff=0
+    countemptyalignments=0
+    countmissingref=0
+    log_info=list()
     for f in files:
-        # If -DROPPED in filename, write blank output file
         if "-DROPPED" in str(f.stem):
             output_fn = filtered_chrom_outdir / f.name
             with open(output_fn, 'w') as oh:
@@ -245,10 +250,8 @@ def run_pw_per_chromosome(
             try:
                 assert(len(fh.keys()) > 0)
                 seqs, lenseqs = _make_seq_dict(fh)
-                numindivs = len(fh.keys())
                 newseqs = SplitAlignedSeqsIntoWindows(
                     seqs,
-                    numindivs,
                     lenseqs,
                     PW_WINDOW_SIZE,
                     PW_STEP,
@@ -256,7 +259,15 @@ def run_pw_per_chromosome(
                     PW_REF,
                     PW_ZSCORE,
                     PW_PDIST_CUTOFF,
+                    PW_EXCLUDE_LIST,
                 )
+                if newseqs == "NoReference":  # If newseqs is empty
+                    outfile = filtered_chrom_outdir / f"{f.stem}-DROPPED.fasta"
+                    dropped_files.append(f'*Window Dropped* | File: {outfile.name} | Reason: Reference sample not found in alignment ')
+                    WriteOUT(outfile, "")
+                    raise Exception
+                if lenseqs == 0:
+                    raise AssertionError
                 perccov = CalculatePercentAACoverageForEachSequenceInDictionary(newseqs, lenseqs, PW_MISSING_CHAR)
                 # If any window has a percov < PW_PC_CUTOFF then the entire window is rejected
                 boolean = Return1IfValueIsGreaterThanCutoffForAllInDictionary(perccov, PW_PC_CUTOFF, countshit)
@@ -266,27 +277,42 @@ def run_pw_per_chromosome(
                     WriteOUT(outfile, output)
                 elif boolean == 0:
                     outfile = filtered_chrom_outdir / f"{f.stem}-DROPPED.fasta"
-                    dropped_files.append(outfile)
+                    dropped_files.append(f'*Window Dropped* | File: {outfile.name} | Reason: Failed to meet coverage threshold')
                     WriteOUT(outfile, "")
                     countperccovcutoff += 1
             except AssertionError:
-                logger.info(f"{f.name} has no information -- Ignoring")
+                logger.debug(f"{f.name} has no information -- Ignoring")
+                outfile = filtered_chrom_outdir / f"{f.stem}-DROPPED.fasta"
+                dropped_files.append(f'*Window Dropped* | File: {outfile.name} | Reason: No sequence content ')
+                WriteOUT(outfile, "")
                 countemptyalignments += 1
+            # except Exception as e:
+            #     print(e)
+            #     logger.debug(f"{f.name} does not contain reference sample -- Skipping file")
+            #     countmissingref += 1
+
     num_valid_files_remaining = len([i for i in filtered_chrom_outdir.iterdir() if "-DROPPED" not in i.name])
     log_info = [
-        "====================================",
-        f"--- Chromosome {chrom.stem} ---",
-        f"Total windows in chromosome: {len(files)}",
-        f"Total valid windows at start of run: {len(init_valid_files)}",
-        f"Total windows dropped from previous steps: {len(init_dropped_files)}",
-        f"Total valid windows remaining after pairwise filter: {num_valid_files_remaining}",
-        f"Total windows dropped by pairwise coverage cutoff: {countperccovcutoff}",
-        f"Total empty alignments after pairwise filter: {countemptyalignments}",
-        f"Number of times a sample caused a window to be dropped (Multiple samples can count for a single window):",
-        countshit,
-        f"Files dropped by pairwise filtration: {len(dropped_files)} in total",
-        dropped_files,
-        "====================================",
+        [
+            "====================================",
+            f"Chromosome: {chrom.stem}",
+            f"Total windows in chromosome: {len(files)}",
+            f"Total windows dropped from previous steps: {len(init_dropped_files)}",
+            f"Total valid windows at start of run: {len(init_valid_files)}",
+            f"Total valid windows remaining after pairwise filter: {num_valid_files_remaining}",
+            f"Total windows dropped by pairwise coverage cutoff: {countperccovcutoff}",
+            f"Total windows dropped by missing reference sample: {countmissingref}",
+            f"Total windows dropped by empty alignments after pairwise filter: {countemptyalignments}",
+            "------------------------------------",
+            f"Total windows dropped by a given sample (multiple samples can count for a single window):",
+            countshit,
+            "------------------------------------",
+        ],
+        [
+            f"Total files dropped by pairwise filtration: {len(dropped_files)}",
+            dropped_files,
+            "====================================",
+        ],
     ]
     return_dict[chrom.name] = log_info
     return return_dict
@@ -345,17 +371,30 @@ def pairwise_filter(
     # Log output information
     for c in return_dict.keys():
         log_info = return_dict[c]
-        for i in log_info:
+        for i in log_info[0]:
             if type(i) == str:
                 logger.info(i)
             elif type(i) == dict:
                 for n in i.keys():
-                    logger.info(f'-- {n}: {i[n]}')
-                    continue
+                    logger.info(f'- {n}: {i[n]}')
+                    pass
             elif type(i) == list:
                 for f in i:
-                    logger.info(f"-- {f.name}")
-                    continue
+                    logger.info(f"- {f.name}")
+                    pass
+        for i in log_info[1]:
+            if type(i) == str:
+                logger.info(i)
+            elif type(i) == dict:
+                for n in i.keys():
+                    logger.info(f'- {n}: {i[n]}')
+                    pass
+            elif type(i) == list:
+                for f in i:
+                    logger.info(f"{f}")
+                    pass
+            else:
+                print(i)
 
 
     return None

@@ -12,10 +12,10 @@ from tqdm import tqdm
 def set_logger_level(WORKING_DIR, LOG_LEVEL):
     logger = logging.getLogger(__name__)
     # Remove existing log file if present
-    if os.path.exists(WORKING_DIR / 'logs/topobin.log'):
-        os.remove(WORKING_DIR / 'logs/topobin.log')
+    if os.path.exists(WORKING_DIR / 'logs/topobinner.log'):
+        os.remove(WORKING_DIR / 'logs/topobinner.log')
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler(WORKING_DIR / 'logs/topobin.log')
+    file_handler = logging.FileHandler(WORKING_DIR / 'logs/topobinner.log')
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
     logger.addHandler(file_handler)
@@ -47,9 +47,8 @@ def tv_header_validation(df):
         return False
 
 ############################### Main Function ################################
-def topobinner(TREEVIEWER_FN, UPDATED_TV_FILENAME, TOPOBIN_ROOTED, WORKING_DIR, MULTIPROCESS, LOG_LEVEL):
+def topobinner(TREEVIEWER_FN, UPDATED_TV_FILENAME, TOPOBIN_ROOTED, WORKING_DIR, LOG_LEVEL):
     logger = set_logger_level(WORKING_DIR, LOG_LEVEL)  # Setup log file level
-    
     # Load in Tree Viewer excel file
     df = pd.read_excel(TREEVIEWER_FN, engine='openpyxl')
     df = df.reset_index(drop=True)
@@ -68,7 +67,7 @@ def topobinner(TREEVIEWER_FN, UPDATED_TV_FILENAME, TOPOBIN_ROOTED, WORKING_DIR, 
         TOPOBIN_ROOTED = True
     # Bin Trees
     tqdm_text = "#" + "{}".format("run1").zfill(3)
-    with tqdm(total=len(trees), desc=tqdm_text, ascii=True) as pbar:
+    with tqdm(total=len(trees), desc=tqdm_text) as pbar:
         for n, t in enumerate(trees):
             # Check to see if tree is NoTree
             if t == "NoTree":

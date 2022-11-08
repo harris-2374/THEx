@@ -18,10 +18,11 @@ docs_sidebar = html.Div(
                 dbc.Button("Signal Tracer", id="docs-pdist-button", className="tv-docs-buttons", color="info", outline=True),
                 dbc.Button("THExBuilder", id="docs-thexb-button", className="tv-docs-buttons", color="info", outline=True),
             ],
-            vertical=True,
+            # vertical=True,
             pills=True,
         ),
     ],
+    style={'width': "100%"}
 )
 
 docs_tv_df = pd.DataFrame({
@@ -88,7 +89,7 @@ docs_treeviewer_contents = html.Div(
                 """
                 There are two required input files to run Tree Viewer: 1. Tree Viewer input file and 2. chromosome length BED file. 
                 These two files provide the required information to visualize phylogenetic signal across the genome in proper scale 
-                to the chromosome length. Additional window-based data types can be added to the Tree Viewer input file providing, 
+                to the chromosome length. Additional window-based data types can be added to the Tree Viewer input file providing 
                 the ability to visualize a multitude of data types concurrently. These additional data types are added as a new column 
                 in the Tree Viewer file keeping your data succinct and organized.
                 """,
@@ -104,7 +105,7 @@ docs_treeviewer_contents = html.Div(
                 covers bases 1-100,000 for 100kb windows), NewickTree, and TopologyID. The first four columns are required and must have 
                 the appropriate headers in the order given in the example input below. Tree Viewer accepts four different file extensions 
                 (.csv, .tsv, .txt, .xlsx) for the input file. Note there are column and per-cell limitations to [Excel files](https://support.microsoft.com/en-us/office/excel-specifications-and-limits-1672b34d-7043-467e-8e27-269d656771c3) (.xlsx) files, so 
-                large datasets may be better off in a flat file format like .csv, .tsv, or .txt. Ensure the headers of your file match the headers shown in the example below!
+                large datasets may be better off in a flat file format like .csv, .tsv, or .txt. Ensure the headers of your file match the headers shown in the example below.
 
                 """
                 ],
@@ -176,7 +177,7 @@ docs_treeviewer_contents = html.Div(
                 ### _- Chromosome Length BED File -_
                 The second file required to run Tree Viewer is a BED file (.bed) of chromosome lengths. Ensure that the chromosome length bed 
                 file contains all chromosomes that are found in the Tree Viewer main input file, otherwise you will be prompted with an error 
-                and asked to update your BED file with the missing data. It is also important that you create your file with headers as shown below!
+                and asked to update your BED file with the missing data. It is also important that you create your file with headers as shown below.
                 """
                 ],
                 className="tv-docs-content-text"
@@ -317,8 +318,43 @@ docs_treeviewer_contents = html.Div(
                 className="tv-docs-content-text"
             ),
             html.Br(),
+            html.Hr(style={"background-color": "black"}),
+            # References
+            html.H3(
+                children=["References"],
+                className="tv-docs-content-title"
+            ),
+            dcc.Markdown(
+                children=[
+                """
+                1.	Edelman, N. B. et al. Genomic architecture and introgression shape a butterfly radiation. Science (80-. ). 366, 594–599 (2019).
+
+                2.	Li, G., Figueiró, H. V, Eizirik, E., Murphy, W. J. & Yoder, A. Recombination-Aware Phylogenomics Reveals the Structured Genomic Landscape of Hybridizing Cat Species. Mol. Biol. Evol. 36, 2111–2126 (2019).
+
+                3.	Nelson, T. C. et al. Ancient and recent introgression shape the evolutionary history of pollinator adaptation and speciation in a model monkeyflower radiation (Mimulus section Erythranthe). PLOS Genet. 17, e1009095 (2021).
+
+                4.	Small, S. T. et al. Radiation with reticulation marks the origin of a major malaria vector. Proc. Natl. Acad. Sci. 202018142 (2020) doi:10.1073/pnas.2018142117.
+
+                5.	trimAl: a tool for automated alignment trimming in large-scale phylogenetic analyses. Salvador Capella-Gutierrez; Jose M. Silla-Martinez; Toni Gabaldon. Bioinformatics 2009 25: 1972-1973.
+
+                6.	Foley et al. Zoonomia Phylogenetic Analysis (unpublished)
+
+                7.	L.-T. Nguyen, H.A. Schmidt, A. von Haeseler, B.Q. Minh (2015) IQ-TREE: A fast and effective stochastic algorithm for estimating maximum likelihood phylogenies.. Mol. Biol. Evol., 32:268-274. 
+
+                8.	S.M. Crotty, B.Q. Minh, N.G. Bean, B.R. Holland, J. Tuke, L.S. Jermiin, A. von Haeseler (2019) GHOST: Recovering historical signal from heterotachously-evolved sequence alignments. Syst. Biol., in press. https://doi.org/10.1093/sysbio/syz051
+
+                9.	Robinson, D. F. & Foulds, L. R. Comparison of phylogenetic trees. Math. Biosci. 53, 131–147 (1981).
+
+                10.	ETE 3: Reconstruction, analysis and visualization of phylogenomic data. Jaime Huerta-Cepas, Francois Serra and Peer Bork. Mol Biol Evol 2016; doi: 10.1093/molbev/msw046
+
+                11.	Bredemeyer, K. R. et al. Ultracontinuous Single Haplotype Genome Assemblies for the Domestic Cat (Felis catus) and Asian Leopard Cat (Prionailurus bengalensis). J. Hered. 112, 165–173 (2021).
+
+                """
+                ],
+                className="tv-docs-content-text"
+            ),
             # html.Hr(style={"background-color": "black"}),
-            # Important comments + Performance
+            ## Important comments + Performance
             # html.H3(
             #     children=["Notes"],
             #     className="tv-docs-content-title"
@@ -490,6 +526,41 @@ docs_pdist_contents = html.Div(
                 className="tv-docs-content-text"
             ),
             html.Br(),
+            html.Hr(style={"background-color": "black"}),
+            # References
+            html.H3(
+                children=["References"],
+                className="tv-docs-content-title"
+            ),
+            dcc.Markdown(
+                children=[
+                """
+                1.	Edelman, N. B. et al. Genomic architecture and introgression shape a butterfly radiation. Science (80-. ). 366, 594–599 (2019).
+
+                2.	Li, G., Figueiró, H. V, Eizirik, E., Murphy, W. J. & Yoder, A. Recombination-Aware Phylogenomics Reveals the Structured Genomic Landscape of Hybridizing Cat Species. Mol. Biol. Evol. 36, 2111–2126 (2019).
+
+                3.	Nelson, T. C. et al. Ancient and recent introgression shape the evolutionary history of pollinator adaptation and speciation in a model monkeyflower radiation (Mimulus section Erythranthe). PLOS Genet. 17, e1009095 (2021).
+
+                4.	Small, S. T. et al. Radiation with reticulation marks the origin of a major malaria vector. Proc. Natl. Acad. Sci. 202018142 (2020) doi:10.1073/pnas.2018142117.
+
+                5.	trimAl: a tool for automated alignment trimming in large-scale phylogenetic analyses. Salvador Capella-Gutierrez; Jose M. Silla-Martinez; Toni Gabaldon. Bioinformatics 2009 25: 1972-1973.
+
+                6.	Foley et al. Zoonomia Phylogenetic Analysis (unpublished)
+
+                7.	L.-T. Nguyen, H.A. Schmidt, A. von Haeseler, B.Q. Minh (2015) IQ-TREE: A fast and effective stochastic algorithm for estimating maximum likelihood phylogenies.. Mol. Biol. Evol., 32:268-274. 
+
+                8.	S.M. Crotty, B.Q. Minh, N.G. Bean, B.R. Holland, J. Tuke, L.S. Jermiin, A. von Haeseler (2019) GHOST: Recovering historical signal from heterotachously-evolved sequence alignments. Syst. Biol., in press. https://doi.org/10.1093/sysbio/syz051
+
+                9.	Robinson, D. F. & Foulds, L. R. Comparison of phylogenetic trees. Math. Biosci. 53, 131–147 (1981).
+
+                10.	ETE 3: Reconstruction, analysis and visualization of phylogenomic data. Jaime Huerta-Cepas, Francois Serra and Peer Bork. Mol Biol Evol 2016; doi: 10.1093/molbev/msw046
+
+                11.	Bredemeyer, K. R. et al. Ultracontinuous Single Haplotype Genome Assemblies for the Domestic Cat (Felis catus) and Asian Leopard Cat (Prionailurus bengalensis). J. Hered. 112, 165–173 (2021).
+
+                """
+                ],
+                className="tv-docs-content-text"
+            ),
             # html.Hr(style={"background-color": "black"}),
         ], width={"size": 8, "offset": 2}, style={"background-color": "white"}),
     ],
@@ -670,7 +741,7 @@ docs_thexb_contents = html.Div(
                     --pw_subwindow_size = "Sub-window size" (default: 100bp)
                     --pw_step 10bp = "Sub-window step size" (default: 10bp)
                     --pw_min_seq_len = "Minimum length of sequence in a given window to be retained" (default: 1000bp)
-                    --pw_max_pdist = "Maximum p-distance for a given taxon to be considered non-extreme. Any sequence above this value in a given sub-window will be masked. Note this value is dataset and taxon dependent!" (default: 0.15)
+                    --pw_max_pdist = "Maximum p-distance for a given taxon to be considered non-extreme. Any sequence above this value in a given sub-window will be masked. Note this value is dataset and taxon dependent." (default: 0.15)
                     --pw_zscore_cutoff = "Maximum number of standard deviations away from the mean (calculated as z-score) allowed before entire window is masked." (default: 2)
                     --pw_seq_coverage = "Minimum valid, non-missing sequence coverage. Individual sequences below this value are masked." (default: 0.9)
                     ```
@@ -772,7 +843,7 @@ docs_thexb_contents = html.Div(
                 The missing data threshold is a value between 0.0 and 1.0 that indicates the maximum amount of missing data 
                 (gaps or masked sequence) allowed for a single taxon, and if that threshold is surpassed, then the values for all 
                 taxa in the window are set to NULL. The output from this pipeline is formatted to be directly uploaded into the Signal 
-                Tracer dashboard for quick visualization!
+                Tracer dashboard for quick visualization.
                 
                 _Example Command_:
                 ```py
@@ -788,6 +859,41 @@ docs_thexb_contents = html.Div(
                 className="tv-docs-content-text"
             ),
             html.Br(),
+            html.Hr(style={"background-color": "black"}),
+            # References
+            html.H3(
+                children=["References"],
+                className="tv-docs-content-title"
+            ),
+            dcc.Markdown(
+                children=[
+                """
+                1.	Edelman, N. B. et al. Genomic architecture and introgression shape a butterfly radiation. Science (80-. ). 366, 594–599 (2019).
+
+                2.	Li, G., Figueiró, H. V, Eizirik, E., Murphy, W. J. & Yoder, A. Recombination-Aware Phylogenomics Reveals the Structured Genomic Landscape of Hybridizing Cat Species. Mol. Biol. Evol. 36, 2111–2126 (2019).
+
+                3.	Nelson, T. C. et al. Ancient and recent introgression shape the evolutionary history of pollinator adaptation and speciation in a model monkeyflower radiation (Mimulus section Erythranthe). PLOS Genet. 17, e1009095 (2021).
+
+                4.	Small, S. T. et al. Radiation with reticulation marks the origin of a major malaria vector. Proc. Natl. Acad. Sci. 202018142 (2020) doi:10.1073/pnas.2018142117.
+
+                5.	trimAl: a tool for automated alignment trimming in large-scale phylogenetic analyses. Salvador Capella-Gutierrez; Jose M. Silla-Martinez; Toni Gabaldon. Bioinformatics 2009 25: 1972-1973.
+
+                6.	Foley et al. Zoonomia Phylogenetic Analysis (unpublished)
+
+                7.	L.-T. Nguyen, H.A. Schmidt, A. von Haeseler, B.Q. Minh (2015) IQ-TREE: A fast and effective stochastic algorithm for estimating maximum likelihood phylogenies.. Mol. Biol. Evol., 32:268-274. 
+
+                8.	S.M. Crotty, B.Q. Minh, N.G. Bean, B.R. Holland, J. Tuke, L.S. Jermiin, A. von Haeseler (2019) GHOST: Recovering historical signal from heterotachously-evolved sequence alignments. Syst. Biol., in press. https://doi.org/10.1093/sysbio/syz051
+
+                9.	Robinson, D. F. & Foulds, L. R. Comparison of phylogenetic trees. Math. Biosci. 53, 131–147 (1981).
+
+                10.	ETE 3: Reconstruction, analysis and visualization of phylogenomic data. Jaime Huerta-Cepas, Francois Serra and Peer Bork. Mol Biol Evol 2016; doi: 10.1093/molbev/msw046
+
+                11.	Bredemeyer, K. R. et al. Ultracontinuous Single Haplotype Genome Assemblies for the Domestic Cat (Felis catus) and Asian Leopard Cat (Prionailurus bengalensis). J. Hered. 112, 165–173 (2021).
+
+                """
+                ],
+                className="tv-docs-content-text"
+            ),
         ], width={"size": 8, "offset": 2}, style={"background-color": "white"}),
     ],
 )
@@ -804,7 +910,7 @@ layout = dbc.Container(
                         html.Div([
                             dbc.Button(
                                 children=[
-                                    html.Img(src=app.get_asset_url("docs4.svg"), height='40px'),
+                                    html.Img(src=app.get_asset_url("docs4.svg"), height='30px'),
                                     html.Div("Docs")
                                 ],
                                 className="logo-png",
@@ -817,6 +923,12 @@ layout = dbc.Container(
                     className="homepage-title-col"
                 ),
                 dbc.Col(
+                    children=[
+                        html.H2("Contents | ", style={'vertical-align': 'middle', 'paddingTop': '4px'}),
+                        dbc.Button("Tree Viewer", id="docs-treeviewer-button", className="tv-docs-buttons", color="primary"),
+                        dbc.Button("Signal Tracer", id="docs-pdist-button", className="tv-docs-buttons", color="primary"),
+                        dbc.Button("THExBuilder", id="docs-thexb-button", className="tv-docs-buttons", color="primary"),
+                    ],
                     width=8,
                     className="homepage-title-col"
                 ),
@@ -827,23 +939,22 @@ layout = dbc.Container(
         dbc.Row(
             children=[
                 # Sidebar
-                dbc.Col(
-                    children=[docs_sidebar],
-                    width=2,
-                    style={"border": "orange solid 2px", "background-color": "#575151", "border-radius": "5px"},
-                ),
+                # dbc.Col(
+                #     children=[docs_sidebar],
+                #     width=12,
+                #     style={"border": "orange solid 2px", "background-color": "#575151", "border-radius": "5px"},
+                # ),
                 # Content
                 dbc.Col(
                     children=[docs_content],
-                    width=10,
+                    width=12,
                     style={"border": "orange solid 2px", "border-radius": "5px"},
                 ),
             ],
-            style={"height": "92vh", "padding": "5px"}
+            style={"padding": "2px"}
         ),
     ],
     fluid=True,
-    style={"height": "100vh"}
 )
 
 def docs_layout():

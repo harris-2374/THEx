@@ -1,10 +1,13 @@
 import logging
 import os
 from multiprocessing import Pool, Value
+from time import time
 
 from Bio import AlignIO
 from Bio.Phylo.TreeConstruction import DistanceCalculator
+from pyfaidx import Fasta
 import pandas as pd
+import numpy as np
 
 from thexb.UTIL_checks import check_fasta
 ################################ Important Info ################################
@@ -49,70 +52,127 @@ def set_logger_level(WORKING_DIR, LOG_LEVEL):
     return logger
 
 ############################## Helper Functions ###############################
-# Make window generator
-def window_generator(start, stop, WINDOW_SIZE_INT):
-    return (start + WINDOW_SIZE_INT), (stop + WINDOW_SIZE_INT)
+def generate_windows(seq_len, WINDOW_SIZE_INT):
+    """
+    Generate non-overlapping sliding windows
+    """
+    windows = [
+        (s, e) for s, e in zip(
+            range(1, seq_len, WINDOW_SIZE_INT),
+            range(WINDOW_SIZE_INT, seq_len+WINDOW_SIZE_INT, WINDOW_SIZE_INT)
+        )
+    ]
+    # Change last window end position to length of sequence - required for pyfaidx
+    windows = windows[:-1] + [(windows[-1][0], seq_len)]
+    return windows
 
-def process_file(f, WINDOW_SIZE_INT, MISSING_CHAR, PDIST_THRESHOLD, PW_REF):
+def make_init_df(chromosome, queries, windows):
+    """
+    Generate initial dataframe with all data except p-distance values
+    """
+    chromosome_list = [chromosome]*(len(windows)*len(queries))
+    start_positions_list = [w[0] for w in windows]*len(queries)
+    end_positions_list = [w[1] for w in windows]*len(queries)
+    windows_list = [w[0] for w in windows]*len(queries)  # Sets window as starting position
+    sample_list = []
+
+    for q in queries:
+        sample_list = sample_list + [q]*len(windows)
+
+    return pd.DataFrame({
+        "Chromosome": chromosome_list,
+        "Start": start_positions_list,
+        "End": end_positions_list,
+        "Window": windows_list,
+        "Sample": sample_list,
+        "Value": [pd.NA]*(len(windows)*len(queries)),
+    })
+
+
+def pairwise_pi(seq1, seq2, PDIST_MISSING_CHAR, PDIST_IGNORE_N, PDIST_THRESHOLD):
+    """
+    Written by Jonas Lescroart - 10/26/2022
+    Edited by Andrew Harris - 10/26/2022
+
+    Returns a single per-site pi value for two DNA sequences of equal length.
+    Sites with missing data are optionally ignored in the final calculation.
+    """
+    variable_sites = 0
+    invariable_sites = 0
+    missing_sites = 0
+
+    for i,j in zip(seq1.upper(), seq2.upper()):
+        if PDIST_MISSING_CHAR in (i, j):
+            missing_sites += 1
+            continue
+        elif i == j:
+            invariable_sites += 1
+            continue
+        elif i != j:
+            variable_sites += 1
+            continue
+        else:
+            raise ValueError(f"Invalid base {i} or {j}")
+
+    if variable_sites == invariable_sites == 0:
+        return pd.NA
+    elif (missing_sites/(len(seq1))) >= PDIST_THRESHOLD:
+        return pd.NA
+    elif not PDIST_IGNORE_N:
+        return (variable_sites + missing_sites)/(len(seq1))
+    else:
+        return variable_sites/(invariable_sites + variable_sites)
+
+def process_file(f, WINDOW_SIZE_INT, PDIST_MISSING_CHAR, PDIST_THRESHOLD, REFERENCE, PDIST_IGNORE_N):
     """
     Load fasta file and calculate p-distance for file. Return resulting dataframe.   
     """
-    # Make pandas df to save results
-    pdist_df = pd.DataFrame()
+    chromosome = str(f.stem).replace(".fasta", "").replace(".fa", "").replace(".fna", "").replace(".fas", "")
     # Load each chromosome file
-    alignment = AlignIO.read(f.as_posix(), 'fasta')
-    logger.info(f"{f.name} alignment loaded, starting p-distance calculation")
-    calculator = DistanceCalculator('identity')
-    samples = [r.id for r in alignment]
-    # Ensure reference sample name provide is found in file
-    try:
-        assert PW_REF in samples
-    except AssertionError:
-        raise AssertionError("Reference sample provided is not in fasta file")
-    if pdist_df.empty:
-        pdist_df = pd.DataFrame(columns=['Chromosome', 'Window', "Sample", "Value"])
-    start = -WINDOW_SIZE_INT
-    stop = 0
-    while True:
-        win_start, win_stop = window_generator(start, stop, WINDOW_SIZE_INT)
-        window_aln = alignment[:, win_start:win_stop]
-        if window_aln.get_alignment_length() == 0:
-            break
-        # Check missing data
-        drop_samples = []
-        for i in window_aln:
-            sample_name = i.name
-            sample_seq = i.seq
-            missing_freq = sample_seq.count(MISSING_CHAR)/len(sample_seq)
-            if missing_freq > PDIST_THRESHOLD:
-                drop_samples.append(sample_name)
-            else:
-                continue
-        dist_matrix = calculator.get_distance(window_aln)
-        window_contents = {
-            "Chromosome": [f.stem]*len(samples),
-            "Window": [win_stop]*len(samples),
-            "Sample":samples,
-            "Value":dist_matrix[PW_REF],
-        }
-        window_df = pd.DataFrame(window_contents)
-        window_df.loc[window_df['Sample'].isin(drop_samples), 'Value'] = pd.NA
-        try:
-            pdist_df = pd.concat([pdist_df, window_df])
-        except ValueError:
-            pass
-        # Update window position
-        start = win_start
-        stop = win_stop
-        continue
-    logger.info(f"Completed {f.name}")
-    return pdist_df
+    with Fasta(f) as alignment:
+        queries = [i for i in alignment.keys() if i != REFERENCE]
+        logger.debug(f"{f.name} alignment loaded, starting p-distance calculation")
+        # Generate windows
+        windows = generate_windows(len(alignment[REFERENCE][:].seq), WINDOW_SIZE_INT)
+        # Log file information
+        logger.info("========================")
+        logger.info(f"File: {f.name}")
+        logger.info(f"Number of windows: {len(windows)}")
+        logger.info(f"Samples to test: {queries}")
+        # Make pandas df to save results
+        df = make_init_df(chromosome, queries, windows)
+        # Calculate p-distance - version 1 (testing)
+        for n, row in enumerate(df.to_dict('records')):
+            s1 = time()
+            df.at[n, "Value"] = pairwise_pi(
+                alignment[REFERENCE][row['Start']:row['End']].seq,
+                alignment[row['Sample']][row['Start']:row['End']].seq,
+                PDIST_MISSING_CHAR,
+                PDIST_IGNORE_N,
+                PDIST_THRESHOLD,
+            )
+            logger.debug(f"{n:,}/{len(df):,} windows complete for {chromosome} :: Time:{time()- s1:.2} seconds :: DF Memory: {df.memory_usage(deep=True).sum():,}") if n%10 == 0 else None
+            continue
+        df.drop(columns=['Start', 'End'], inplace=True)
+    
+    logger.debug(f"-- Completed {f.name} --")
+    return df
 
 ############################### Main Function ################################
-def pdistance_calculator(INPUT, pdistance_output_dir, PDIST_THRESHOLD, PW_REF, MISSING_CHAR, WORKING_DIR, WINDOW_SIZE_INT, MULTIPROCESS, LOG_LEVEL):
+def pdistance_calculator(
+    INPUT,
+    pdistance_output_dir,
+    PDIST_THRESHOLD,
+    PDIST_FILENAME,
+    PDIST_MISSING_CHAR,
+    REFERENCE,
+    WORKING_DIR,
+    WINDOW_SIZE_INT,
+    PDIST_IGNORE_N,
+    MULTIPROCESS,
+    LOG_LEVEL,
+):
     set_logger_level(WORKING_DIR, LOG_LEVEL)
-    sum_size = 0
-    files = []
     # Set cpu count for multiprocessing
     if type(MULTIPROCESS) == int:
         # Ensure not asking for more than available
@@ -122,26 +182,20 @@ def pdistance_calculator(INPUT, pdistance_output_dir, PDIST_THRESHOLD, PW_REF, M
         cpu_count = os.cpu_count()
     # Collect input files
     if INPUT.is_file():
-        chromosome_files = [INPUT]
+        files = [INPUT]
         pass
     elif INPUT.is_dir():
-        chromosome_files = [f for f in INPUT.iterdir() if check_fasta(f)]
-
-    # Get files based on pattern and their sum of size
-    for file in reversed(chromosome_files):
-        sum_size =sum_size + os.path.getsize(file)
-        files.append(file)
-    logger.info(f'files:{len(files)} - size:{sum_size:,} bytes - processes:{cpu_count}')
+        files = [f for f in INPUT.iterdir() if check_fasta(f)]
     # Create the pool
     process_pool = Pool(processes=cpu_count)
     # Start processes in the pool
-    dfs = process_pool.starmap(process_file, [(f, WINDOW_SIZE_INT, MISSING_CHAR, PDIST_THRESHOLD, PW_REF) for f in files])
+    dfs = process_pool.starmap(process_file, [(f, WINDOW_SIZE_INT, PDIST_MISSING_CHAR, PDIST_THRESHOLD, REFERENCE, PDIST_IGNORE_N) for f in files])
     # Concat dataframes to one dataframe
     try:
         pdist_df = pd.concat(dfs, ignore_index=True)
     except ValueError:
         pass
-    outfile = pdistance_output_dir / 'Signal_Tracer_input.tsv'
+    outfile = pdistance_output_dir / PDIST_FILENAME
     pdist_df.reset_index(drop=True, inplace=True)
     pdist_df.to_csv(outfile, sep='\t', index=False)
     return 

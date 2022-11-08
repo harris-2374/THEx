@@ -1,27 +1,33 @@
 # -*- coding: utf-8 -*-
 import sys
-
+import re
 from setuptools import setup
 
+VERSIONFILE="src/_version.py"
+verstrline = open(VERSIONFILE, "rt").read()
+VSRE = r"^__version__ = ['\"]([^'\"]*)['\"]"
+mo = re.search(VSRE, verstrline, re.M)
+if mo:
+    verstr = mo.group(1)
+else:
+    raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
+
 if sys.version_info[:2] < (3, 7):
-    sys.exit("TreeHouseExplorer is only meant for Python >=3.7"
-             "Current Python version: %d.%d" % sys.version_info[:2])
+    sys.exit("Tree House Explorer (THEx) requires Python >=3.7 Current Python version: %d.%d" % sys.version_info[:2])
 
 setup(
     name="thex",
-    version="1.0.0",
+    version=verstr,
     author="Andrew Harris",
     author_email="ajharris.2374@gmail.com",
     url="https://github.com/harris-2374/THEx",
     license="MIT",
     classifiers=[
-        "Development Status :: 4 - Beta",
-        "Operating System :: OS Independent",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
     ],
-    description="TreeHouseExplorer is a novel phylogenomic genome browser.",
+    description="Tree House Explorer (THEx) is a novel phylogenomic genome browser.",
     package_dir = {"": "src"},
     packages=["thex", "thex.assets", "thex.apps", "thex.apps.utils", "thexb"],
     package_data={'thex': ['assets/*']},

@@ -1,5 +1,6 @@
 import math
 import itertools
+import re
 
 import numpy as np
 import pandas as pd
@@ -32,7 +33,9 @@ class DrawTree():
             if self.branch_len:
                 xcoords = tree.depths(unit_branch_lengths=True)
             else:
-                xcoords = tree.depths()
+                max_depth = max(tree.depths().values())
+                xcoords = {k: abs(v-max_depth) for k, v in tree.depths().items()}
+                # xcoords = 
 
             # tree.depth() maps tree clades to depths (by branch length).
             # returns a dict {clade: depth} where clade runs over all Clade instances of the tree, and depth is the distance from root to clade
@@ -221,264 +224,48 @@ class DrawTree():
             nodes.append(node)
         # Set graph x-range
         if self.branch_len:
-            x_range = [-0.5, (max(x_coords.values())+2)]
-            show_xaxis = False
-        elif max(x_coords.values()) < 0.1:
-            x_range = [0, (max(x_coords.values())+(max(x_coords.values())*1.25))]
-            show_xaxis = True
-        elif max(x_coords.values()) < 0.5:
-            x_range = [0, 0.5]
-            show_xaxis = True
-        elif max(x_coords.values()) < 1:
-            x_range = [0, 1]
-            show_xaxis = True
-        elif max(x_coords.values()) == 1:
-            x_range = [0, max(x_coords.values())+2]
-            show_xaxis = False
+            layout = dict(
+                autosize=True,
+                showlegend=False,
+                template=self.template,
+                dragmode="pan",
+                margin=dict(t=0, b=0, r=0, l=0),
+                xaxis=dict(
+                    showline=True,
+                    zeroline=False,
+                    visible=False,
+                    showgrid=False,
+                    showticklabels=True,
+                    range=[-1, max(x_coords.values())+2]
+                ),
+                yaxis=axis,
+                hovermode="closest",
+                shapes=line_shapes,
+                font=dict(family=self.font_family,size=14),
+            )
         else:
-            x_range = [0, max(x_coords.values())+2]
-            show_xaxis = False
-
-        layout = dict(
-            autosize=True,
-            showlegend=False,
-            template=self.template,
-            dragmode="pan",
-            margin=dict(t=20, b=10, r=20, l=10),
-            xaxis=dict(
-                showline=True,
-                zeroline=False,
-                visible=show_xaxis,
-                showgrid=False,
-                showticklabels=True,
-                range=x_range,
-            ),
-            yaxis=axis,
-            hovermode="closest",
-            shapes=line_shapes,
-            font=dict(family=self.font_family,size=14),
-        )
-
+            layout = dict(
+                autosize=True,
+                showlegend=False,
+                template=self.template,
+                dragmode="pan",
+                margin=dict(t=0, b=0, r=0, l=0),
+                xaxis=dict(
+                    showline=True,
+                    zeroline=False,
+                    visible=True,
+                    showgrid=False,
+                    showticklabels=True,
+                    autorange='reversed',
+                ),
+                yaxis=axis,
+                hovermode="closest",
+                shapes=line_shapes,
+                font=dict(family=self.font_family,size=14),
+            )
         fig = go.Figure(data=nodes, layout=layout)
         return fig
 
-    def create_angular_tree(self):
-
-        def get_x_coordinates(tree):
-            """Associates to each clade an x-coord.
-            returns dict {clade: x-coord}
-            """
-            # xcoords = tree.depths(unit_branch_lengths=True)
-            # print("===========================")
-            # nodes = [n for n in tree.find_clades()]
-            # nodes = tree.get_terminals() + tree.get_nonterminals()
-            # print(tree.root.clades)
-            # root_xcoord = {tree.root.clades[1]:0}
-            terminal_nodes = tree.get_terminals()
-            internal_nodes = tree.get_nonterminals()
-            terminal_xcoords = dict((leaf, i) for i, leaf in enumerate(terminal_nodes))
-            internal_xcoords = dict(
-                (leaf, i+0.5) for leaf, i in zip(internal_nodes, range(1, len(internal_nodes)))
-            )
-
-            xcoords = {**terminal_xcoords, **internal_xcoords}
-
-
-            # print(xcoords)
-            # print("===========================")
-            # tree.depth() maps tree clades to depths (by branch length).
-            # returns a dict {clade: depth} where clade runs over all Clade instances of the tree, and depth
-            # is the distance from root to clade
-
-            #  If there are no branch lengths, assign unit branch lengths
-            if not max(xcoords.values()):
-                xcoords = tree.depths(unit_branch_lengths=True)
-
-            return xcoords
-
-        def get_y_coordinates(tree, dist=1):
-            """
-            returns  dict {clade: y-coord}
-            The y-coordinates are  (float) multiple of integers (i*dist below)
-            dist depends on the number of tree leafs
-            """
-            maxheight = tree.count_terminals()  # Counts the number of tree leafs.
-            # Rows are defined by the tips/leafs
-            # root_ycoord = {tree.root:maxheight}
-            terminal_nodes = tree.get_terminals()
-            internal_nodes = tree.get_nonterminals()
-            terminal_ycoords = dict((leaf, 1) for _, leaf in enumerate(terminal_nodes))
-            internal_ycoords = dict(
-                (leaf, i) for leaf, i in zip(internal_nodes, reversed(range(1, len(internal_nodes))))
-            )
-            ycoords = {**terminal_ycoords, **internal_ycoords}
-
-            def calc_row(clade):
-                for subclade in clade:
-                    if subclade not in ycoords:
-                        calc_row(subclade)
-                ycoords[clade] = (ycoords[clade.clades[0]] +
-                                  ycoords[clade.clades[-1]]) / 2
-
-            if tree.root.clades:
-                calc_row(tree.root)
-            return ycoords
-
-        def get_clade_lines(
-            orientation="horizontal",
-            y_curr=0,
-            last_y_curr=0,
-            x_start=0,
-            x_curr=0,
-            y_bot=0,
-            y_top=0,
-            line_color="rgb(25,25,25)",
-            line_width=0.5,
-            init_flag=False,
-        ):
-            """define a shape of type 'line', for branch
-            """
-            branch_line = dict(
-                type="line", layer="below", line=dict(color=line_color, width=line_width)
-            )
-            if orientation == "horizontal":
-                if init_flag:
-                    branch_line.update(x0=x_start, y0=y_curr,
-                                       x1=x_curr, y1=y_curr)
-                else:
-                    branch_line.update(
-                        x0=x_start, y0=last_y_curr, x1=x_curr, y1=y_curr)
-            elif orientation == "vertical":
-                branch_line.update(x0=x_curr, y0=y_bot, x1=x_curr, y1=y_top)
-            else:
-                raise ValueError("Line type can be 'horizontal' or 'vertical'")
-            return branch_line
-
-        def draw_clade(
-            clade,
-            x_start,
-            line_shapes,
-            line_color="rgb(15,15,15)",
-            line_width=1,
-            x_coords=0,
-            y_coords=0,
-            last_clade_y_coord=0,
-            init_flag=True
-        ):
-            """Recursively draw the tree branches, down from the given clade"""
-            x_curr = x_coords[clade]
-            y_curr = y_coords[clade]
-
-            # Draw a horizontal line from start to here
-            branch_line = get_clade_lines(
-                orientation="horizontal",
-                y_curr=y_curr,
-                last_y_curr=last_clade_y_coord,
-                x_start=x_start,
-                x_curr=x_curr,
-                line_color=line_color,
-                line_width=line_width,
-                init_flag=init_flag,
-            )
-
-            line_shapes.append(branch_line)
-
-            if clade.clades:
-                # Draw descendants
-                for child in clade:
-                    draw_clade(child, x_curr, line_shapes, x_coords=x_coords,
-                               y_coords=y_coords, last_clade_y_coord=y_coords[clade],
-                               init_flag=False, line_color=line_color)
-        if 'dark' in self.template:
-            text_color = 'white'
-        else:
-            text_color = 'black'
-        line_color = self.color_map[self.topology]
-        # Load in Tree object and ladderize
-        tree = self.newicktree
-        tree.ladderize()
-
-        # Get coordinates + put into dictionary
-        # dict(keys=clade_names, values=)
-        x_coords = get_x_coordinates(tree)
-        y_coords = get_y_coordinates(tree)
-
-        line_shapes = []
-
-        draw_clade(
-            tree.root,
-            0,
-            line_shapes,
-            line_color=line_color,
-            line_width=2,
-            x_coords=x_coords,
-            y_coords=y_coords,
-        )
-        #
-        my_tree_clades = x_coords.keys()
-        X = []
-        Y = []
-        text = []
-
-        for cl in my_tree_clades:
-            X.append(x_coords[cl])
-            Y.append(y_coords[cl])
-            # Add confidence values if internal node
-            if not cl.name:
-                text.append(cl.confidence)
-            else:
-                text.append(cl.name)
-
-        axis = dict(
-            showline=False,
-            zeroline=False,
-            showgrid=False,
-            visible=False,
-            showticklabels=False,
-        )
-
-        label_legend = ["Tree_1"]
-        nodes = []
-
-        for elt in label_legend:
-            node = dict(
-                type="scatter",
-                x=X,
-                y=Y,
-                mode="markers+text",
-                marker=dict(color=text_color, size=5),
-                text=text,  # vignet information of each node
-                textposition='right',
-                textfont=dict(color=text_color, size=25),
-                showlegend=False,
-                name=elt,
-            )
-            nodes.append(node)
-
-        layout = dict(
-            template=self.template,
-            dragmode="select",
-            autosize=True,
-            showlegend=True,
-            xaxis=dict(
-                showline=True,
-                zeroline=False,
-                visible=False,
-                showgrid=False,
-                showticklabels=True,
-                range=[0, (max(x_coords.values())+2)]
-            ),
-            yaxis=axis,
-            hovermode="closest",
-            shapes=line_shapes,
-            legend={"x": 0, "y": 1},
-            font=dict(family="Open Sans"),
-        )
-
-        fig = dict(data=nodes, layout=layout)
-        return fig
-
-    
     def create_circular_tree(self):
         def get_circular_tree_data(tree, order='level', dist=1, start_angle=0, end_angle=360, start_leaf='first'):
             """Define  data needed to get the Plotly plot of a circular tree
@@ -712,6 +499,223 @@ class DrawTree():
         fig = go.Figure(data=[trace_radial_lines, trace_arcs, trace_nodes], layout=layout)
         return fig
 
+    def create_angular_tree(self):
+
+        def get_x_coordinates(tree):
+            """Associates to each clade an x-coord.
+            returns dict {clade: x-coord}
+            """
+            # xcoords = tree.depths(unit_branch_lengths=True)
+            # print("===========================")
+            # nodes = [n for n in tree.find_clades()]
+            # nodes = tree.get_terminals() + tree.get_nonterminals()
+            # print(tree.root.clades)
+            # root_xcoord = {tree.root.clades[1]:0}
+            terminal_nodes = tree.get_terminals()
+            internal_nodes = tree.get_nonterminals()
+            terminal_xcoords = dict((leaf, i) for i, leaf in enumerate(terminal_nodes))
+            internal_xcoords = dict(
+                (leaf, i+0.5) for leaf, i in zip(internal_nodes, range(1, len(internal_nodes)))
+            )
+
+            xcoords = {**terminal_xcoords, **internal_xcoords}
+
+
+            # print(xcoords)
+            # print("===========================")
+            # tree.depth() maps tree clades to depths (by branch length).
+            # returns a dict {clade: depth} where clade runs over all Clade instances of the tree, and depth
+            # is the distance from root to clade
+
+            #  If there are no branch lengths, assign unit branch lengths
+            if not max(xcoords.values()):
+                xcoords = tree.depths(unit_branch_lengths=True)
+
+            return xcoords
+
+        def get_y_coordinates(tree, dist=1):
+            """
+            returns  dict {clade: y-coord}
+            The y-coordinates are  (float) multiple of integers (i*dist below)
+            dist depends on the number of tree leafs
+            """
+            maxheight = tree.count_terminals()  # Counts the number of tree leafs.
+            # Rows are defined by the tips/leafs
+            # root_ycoord = {tree.root:maxheight}
+            terminal_nodes = tree.get_terminals()
+            internal_nodes = tree.get_nonterminals()
+            terminal_ycoords = dict((leaf, 1) for _, leaf in enumerate(terminal_nodes))
+            internal_ycoords = dict(
+                (leaf, i) for leaf, i in zip(internal_nodes, reversed(range(1, len(internal_nodes))))
+            )
+            ycoords = {**terminal_ycoords, **internal_ycoords}
+
+            def calc_row(clade):
+                for subclade in clade:
+                    if subclade not in ycoords:
+                        calc_row(subclade)
+                ycoords[clade] = (ycoords[clade.clades[0]] +
+                                  ycoords[clade.clades[-1]]) / 2
+
+            if tree.root.clades:
+                calc_row(tree.root)
+            return ycoords
+
+        def get_clade_lines(
+            orientation="horizontal",
+            y_curr=0,
+            last_y_curr=0,
+            x_start=0,
+            x_curr=0,
+            y_bot=0,
+            y_top=0,
+            line_color="rgb(25,25,25)",
+            line_width=0.5,
+            init_flag=False,
+        ):
+            """define a shape of type 'line', for branch
+            """
+            branch_line = dict(
+                type="line", layer="below", line=dict(color=line_color, width=line_width)
+            )
+            if orientation == "horizontal":
+                if init_flag:
+                    branch_line.update(x0=x_start, y0=y_curr,
+                                       x1=x_curr, y1=y_curr)
+                else:
+                    branch_line.update(
+                        x0=x_start, y0=last_y_curr, x1=x_curr, y1=y_curr)
+            elif orientation == "vertical":
+                branch_line.update(x0=x_curr, y0=y_bot, x1=x_curr, y1=y_top)
+            else:
+                raise ValueError("Line type can be 'horizontal' or 'vertical'")
+            return branch_line
+
+        def draw_clade(
+            clade,
+            x_start,
+            line_shapes,
+            line_color="rgb(15,15,15)",
+            line_width=1,
+            x_coords=0,
+            y_coords=0,
+            last_clade_y_coord=0,
+            init_flag=True
+        ):
+            """Recursively draw the tree branches, down from the given clade"""
+            x_curr = x_coords[clade]
+            y_curr = y_coords[clade]
+
+            # Draw a horizontal line from start to here
+            branch_line = get_clade_lines(
+                orientation="horizontal",
+                y_curr=y_curr,
+                last_y_curr=last_clade_y_coord,
+                x_start=x_start,
+                x_curr=x_curr,
+                line_color=line_color,
+                line_width=line_width,
+                init_flag=init_flag,
+            )
+
+            line_shapes.append(branch_line)
+
+            if clade.clades:
+                # Draw descendants
+                for child in clade:
+                    draw_clade(child, x_curr, line_shapes, x_coords=x_coords,
+                               y_coords=y_coords, last_clade_y_coord=y_coords[clade],
+                               init_flag=False, line_color=line_color)
+        if 'dark' in self.template:
+            text_color = 'white'
+        else:
+            text_color = 'black'
+        line_color = self.color_map[self.topology]
+        # Load in Tree object and ladderize
+        tree = self.newicktree
+        tree.ladderize()
+
+        # Get coordinates + put into dictionary
+        # dict(keys=clade_names, values=)
+        x_coords = get_x_coordinates(tree)
+        y_coords = get_y_coordinates(tree)
+
+        line_shapes = []
+
+        draw_clade(
+            tree.root,
+            0,
+            line_shapes,
+            line_color=line_color,
+            line_width=2,
+            x_coords=x_coords,
+            y_coords=y_coords,
+        )
+        #
+        my_tree_clades = x_coords.keys()
+        X = []
+        Y = []
+        text = []
+
+        for cl in my_tree_clades:
+            X.append(x_coords[cl])
+            Y.append(y_coords[cl])
+            # Add confidence values if internal node
+            if not cl.name:
+                text.append(cl.confidence)
+            else:
+                text.append(cl.name)
+
+        axis = dict(
+            showline=False,
+            zeroline=False,
+            showgrid=False,
+            visible=False,
+            showticklabels=False,
+        )
+
+        label_legend = ["Tree_1"]
+        nodes = []
+
+        for elt in label_legend:
+            node = dict(
+                type="scatter",
+                x=X,
+                y=Y,
+                mode="markers+text",
+                marker=dict(color=text_color, size=5),
+                text=text,  # vignet information of each node
+                textposition='right',
+                textfont=dict(color=text_color, size=25),
+                showlegend=False,
+                name=elt,
+            )
+            nodes.append(node)
+
+        layout = dict(
+            template=self.template,
+            dragmode="select",
+            autosize=True,
+            showlegend=True,
+            xaxis=dict(
+                showline=True,
+                zeroline=False,
+                visible=False,
+                showgrid=False,
+                showticklabels=True,
+                range=[0, (max(x_coords.values())+2)]
+            ),
+            yaxis=axis,
+            hovermode="closest",
+            shapes=line_shapes,
+            legend={"x": 0, "y": 1},
+            font=dict(family="Open Sans"),
+        )
+
+        fig = dict(data=nodes, layout=layout)
+        return fig
+
+
 class RFDistance():
 
     def __init__(self, t1, t2):
@@ -927,34 +931,36 @@ def make_alt_data_int_figure(
             showline=True,
             showgrid=xaxis_gridlines,
             linewidth=axis_line_width,
+            matches=None,
         )
     else:
         fig.update_xaxes(
             title="Position",
+            range=[0, chromosome_df['End'].max()],
             showline=True,
             showgrid=xaxis_gridlines,
             linewidth=axis_line_width,
-
+            matches=None,
         )
     if y_max < 0.1:
         fig.update_yaxes(
-            fixedrange=True,
+            # fixedrange=True,
             linewidth=axis_line_width,
             range=y_range,
             showgrid=yaxis_gridlines,
             showline=True,
-            title="Edit me",
+            title="Value",
             showexponent = 'all',
             exponentformat = 'e',
         )
     else:
         fig.update_yaxes(
-            fixedrange=True,
+            # fixedrange=True,
             linewidth=axis_line_width,
             range=y_range,
             showgrid=yaxis_gridlines,
             showline=True,
-            title="Edit me",
+            title="Value",
         )
     return fig
 
@@ -983,16 +989,8 @@ def build_histogram_with_rug_plot(
     elif type(current_topologies) == list:
         wanted_rows = topology_df[topology_df["TopologyID"].isin(current_topologies)]
 
-    # Add in psuedodata for missing current_topologies (fixes issue where topology is dropped from legend)
-    if len(wanted_rows['TopologyID'].unique()) < len(current_topologies):
-        missing_topologies = [t for t in current_topologies if t not in wanted_rows['TopologyID'].unique()]
-        for mt in missing_topologies:
-            missing_row_data = [chromosome, 0, 'NA', mt] + ['NULL']*(len(wanted_rows.columns)-4)
-            missing_row = pd.DataFrame(data={i:j for i,j in zip(wanted_rows.columns, missing_row_data)}, index=[0])
-            wanted_rows = pd.concat([wanted_rows, missing_row])
-
     # Group data by topology ID
-    grouped_topology_df = wanted_rows.sort_values(['TopologyID'],ascending=False).groupby(by='TopologyID')
+    grouped_topology_df = wanted_rows.sort_values(['TopologyID'], ascending=False).groupby(by='TopologyID')
 
     # Set row heights based on number of current_topologies being shown
     if len(current_topologies) <= 6:
@@ -1002,7 +1000,6 @@ def build_histogram_with_rug_plot(
     else:
         subplot_row_heights = [8, 2]
     # Build figure
-    # fig = make_subplots(rows=2, cols=1, row_heights=subplot_row_heights, vertical_spacing=0.05, shared_xaxes=True)
     fig = make_subplots(rows=2, cols=1, vertical_spacing=0.05, shared_xaxes=True)
     for topology, data in grouped_topology_df:
         fig.add_trace(
@@ -1016,16 +1013,6 @@ def build_histogram_with_rug_plot(
                 marker_line_width=1,
                 marker_color=[color_mapping[topology]]*len(data),
             ),
-            # go.Box(
-            #     x=data['Window'],
-            #     y=data['TopologyID'],
-            #     boxpoints='all',
-            #     jitter=0,
-            #     legendgroup=topology,
-            #     marker_symbol='line-ns-open',
-            #     marker_color=color_mapping[topology],
-            #     name=topology,
-            # ),
             row=1, col=1,
         )
         fig.add_trace(
@@ -1185,6 +1172,7 @@ def build_rug_plot(
         showgrid=yaxis_gridlines,
         linewidth=axis_line_width,
         showticklabels=False,
+        ticklen=0,
         type='category',
         categoryarray=topoOrder,
     )
@@ -1332,57 +1320,6 @@ def build_alt_data_graph(
     return alt_data_graph_data
 
 
-def build_whole_genome_alt_data_graph(
-    alt_data_to_graph,
-    chromosome_df,
-    color_mapping,
-    topology_df,
-    window_size,
-    template,
-    y_max,
-    axis_line_width,
-    xaxis_gridlines,
-    yaxis_gridlines,
-    font_family,
-):
-    # Check input type and graph accordingly
-    try:
-        input_type = type(topology_df[alt_data_to_graph].dropna().to_list()[0])
-    except IndexError:
-        return no_data_graph(template)
-    if input_type == str:
-        alt_data_graph_data = make_alt_data_str_figure(
-            alt_data_to_graph,
-            chromosome_df,
-            color_mapping,
-            topology_df,
-            window_size,
-            template,
-            None,
-            axis_line_width,
-            xaxis_gridlines,
-            yaxis_gridlines,
-            font_family,
-            True,
-        )
-    else:
-        alt_data_graph_data = make_alt_data_int_figure(
-            alt_data_to_graph,
-            color_mapping,
-            topology_df,
-            chromosome_df,
-            template,
-            None,
-            y_max,
-            axis_line_width,
-            xaxis_gridlines,
-            yaxis_gridlines,
-            font_family,
-            True,
-        )
-    return alt_data_graph_data
-
-
 def build_gff_figure(
     data,
     dataRange,
@@ -1401,7 +1338,7 @@ def build_gff_figure(
         show_gene_names = False
     # Separate 
     # group data by feature and gene name
-    attr_group = data.groupby(by=['feature', 'attribute', 'strand'])
+    attr_group = data.groupby(by=['source', 'feature', 'attribute', 'strand'])
     positive_text_pos = "top center"
     negative_text_pos = "top center"
     features_graphed = list()
@@ -1409,77 +1346,156 @@ def build_gff_figure(
     y_idx = 1
     curr_feature = dict()
     for fg, gene_data in attr_group:        
-        feature, gene, strand = fg
+        src, feature, gene, strand = fg
         feature_strand = f"{feature} ({strand})"
         x_values = sorted(gene_data['start'].to_list() + gene_data['end'].to_list())
-        # Update y-axis value if new feature
-        if not curr_feature:
-            curr_feature[feature_strand] = y_idx
-            y_idx += 1
-        elif feature_strand in curr_feature.keys():
-            pass
-        else:
-            curr_feature[feature_strand] = y_idx
-            y_idx += 1
-        # Set legend show if feature in list already
-        if feature_strand in features_graphed:
-            show_legend = False
-        else:
-            show_legend = True
-            features_graphed.append(feature_strand)
-        # Set color, y-values, and arrow direction
-        if strand == '+':
-            colorValue = 'red'
-            y_values = [curr_feature[feature_strand]]*len(x_values)
-            markerSymbol = ['square']*(len(x_values)-1) + ['triangle-right']
-            text_pos = positive_text_pos
-            text_val = [gene] + ['']*(len(x_values)-1)
-            if positive_text_pos == "top center":
-                positive_text_pos = "bottom center"
-            elif positive_text_pos == "bottom center":
-                positive_text_pos = "top center"
-        else:
-            colorValue = '#009BFF'
-            y_values = [curr_feature[feature_strand]]*len(x_values)
-            markerSymbol = ['triangle-left'] + ['square']*(len(x_values)-1)
-            text_pos = negative_text_pos
-            text_val = ['']*(len(x_values)-1) + [gene]
-            if negative_text_pos == "top center":
-                negative_text_pos = "bottom center"
-            elif negative_text_pos == "bottom center":
-                negative_text_pos = "top center"
-        if show_gene_names:
-            fig.add_trace(go.Scatter(
-                x=x_values,
-                y=y_values,
-                name=feature_strand,
-                legendgroup=feature_strand,
-                mode='markers+lines+text',
-                marker_symbol=markerSymbol,
-                marker_size=8,
-                marker_color=colorValue,
-                text=text_val,
-                textposition=text_pos,
-                textfont=dict(
-                    size=10,
-                ),
-                hovertemplate=None,
-                showlegend=show_legend,
-            ))
-        else:
-            fig.add_trace(go.Scatter(
-                x=x_values,
-                y=y_values,
-                name=feature_strand,
-                legendgroup=feature_strand,
-                mode='markers+lines',
-                marker_symbol=markerSymbol,
-                marker_size=8,
-                marker_color=colorValue,
-                # hoverinfo=['all'],
-                hovertemplate=None,
-                showlegend=show_legend,
-            ))
+        if len(x_values) == 2:
+            # Update y-axis value if new feature
+            if not curr_feature:
+                curr_feature[feature_strand] = y_idx
+                y_idx += 1
+            elif feature_strand in curr_feature.keys():
+                pass
+            else:
+                curr_feature[feature_strand] = y_idx
+                y_idx += 1
+            # Set legend show if feature in list already
+            if feature_strand in features_graphed:
+                show_legend = False
+            else:
+                show_legend = True
+                features_graphed.append(feature_strand)
+            # Set color, y-values, and arrow direction
+            if strand == '+':
+                colorValue = 'red'
+                y_values = [curr_feature[feature_strand]]*len(x_values)
+                markerSymbol = ['square']*(len(x_values)-1) + ['triangle-right']
+                text_pos = positive_text_pos
+                text_val = [gene] + ['']*(len(x_values)-1)
+                # text_val = [gene]*(len(x_values))
+                if positive_text_pos == "top center":
+                    positive_text_pos = "bottom center"
+                elif positive_text_pos == "bottom center":
+                    positive_text_pos = "top center"
+            else:
+                colorValue = '#009BFF'
+                y_values = [curr_feature[feature_strand]]*len(x_values)
+                markerSymbol = ['triangle-left'] + ['square']*(len(x_values)-1)
+                text_pos = negative_text_pos
+                text_val = ['']*(len(x_values)-1) + [gene]
+                # text_val = [gene]*(len(x_values))
+                if negative_text_pos == "top center":
+                    negative_text_pos = "bottom center"
+                elif negative_text_pos == "bottom center":
+                    negative_text_pos = "top center"
+            if show_gene_names:
+                fig.add_trace(go.Scatter(
+                    x=x_values,
+                    y=y_values,
+                    name=feature_strand,
+                    legendgroup=feature_strand,
+                    mode='markers+lines+text',
+                    marker_symbol=markerSymbol,
+                    marker_size=8,
+                    marker_color=colorValue,
+                    text=text_val,
+                    textposition=text_pos,
+                    textfont=dict(
+                        size=10,
+                    ),
+                    hovertemplate=None,
+                    showlegend=show_legend,
+                ))
+            else:
+                fig.add_trace(go.Scatter(
+                    x=x_values,
+                    y=y_values,
+                    name=feature_strand,
+                    legendgroup=feature_strand,
+                    mode='markers+lines',
+                    marker_symbol=markerSymbol,
+                    marker_size=8,
+                    marker_color=colorValue,
+                    # hoverinfo=['all'],
+                    hovertemplate=None,
+                    showlegend=show_legend,
+                ))
+        elif len(x_values) > 2:
+            positions = [x_values[n:n+2] for n in range(0, len(x_values), 2)]
+            for curr_x_values in positions:
+                # Update y-axis value if new feature
+                if not curr_feature:
+                    curr_feature[feature_strand] = y_idx
+                    y_idx += 1
+                elif feature_strand in curr_feature.keys():
+                    pass
+                else:
+                    curr_feature[feature_strand] = y_idx
+                    y_idx += 1
+                # Set legend show if feature in list already
+                if feature_strand in features_graphed:
+                    show_legend = False
+                else:
+                    show_legend = True
+                    features_graphed.append(feature_strand)
+                # Set color, y-values, and arrow direction
+                if strand == '+':
+                    colorValue = 'red'
+                    y_values = [curr_feature[feature_strand]]*len(curr_x_values)
+                    markerSymbol = ['square']*(len(curr_x_values)-1) + ['triangle-right']
+                    text_pos = positive_text_pos
+                    text_val = [gene] + ['']*(len(x_values)-1)
+                    # text_val = [gene]*(len(curr_x_values))
+                    if positive_text_pos == "top center":
+                        positive_text_pos = "bottom center"
+                    elif positive_text_pos == "bottom center":
+                        positive_text_pos = "top center"
+                else:
+                    colorValue = '#009BFF'
+                    y_values = [curr_feature[feature_strand]]*len(curr_x_values)
+                    markerSymbol = ['triangle-left'] + ['square']*(len(curr_x_values)-1)
+                    text_pos = negative_text_pos
+                    text_val = ['']*(len(curr_x_values)-1) + [gene]
+                    # text_val = [gene]*(len(curr_x_values))
+                    if negative_text_pos == "top center":
+                        negative_text_pos = "bottom center"
+                    elif negative_text_pos == "bottom center":
+                        negative_text_pos = "top center"
+                if show_gene_names:
+                    fig.add_trace(go.Scatter(
+                        x=curr_x_values,
+                        y=y_values,
+                        name=feature_strand,
+                        legendgroup=feature_strand,
+                        mode='markers+lines+text',
+                        marker_symbol=markerSymbol,
+                        marker_size=8,
+                        marker_color=colorValue,
+                        text=text_val,
+                        textposition=text_pos,
+                        textfont=dict(
+                            size=10,
+                        ),
+                        hovertemplate=None,
+                        showlegend=show_legend,
+                    ))
+                else:
+                    fig.add_trace(go.Scatter(
+                        x=curr_x_values,
+                        y=y_values,
+                        name=feature_strand,
+                        legendgroup=feature_strand,
+                        mode='markers+lines',
+                        marker_symbol=markerSymbol,
+                        marker_size=8,
+                        marker_color=colorValue,
+                        # hoverinfo=['all'],
+                        hovertemplate=None,
+                        showlegend=show_legend,
+                    ))
+            continue
+        
+
     fig.update_layout(
         hovermode="x unified",
         showlegend=True,
@@ -1658,7 +1674,7 @@ def calculate_topo_quantile_frequencies(df, current_topologies, additional_data,
             for t, f in zip(counts.index, counts):
                 if t == topology:
                     topo_df.at[tidx, "TopologyID"] = t
-                    topo_df.at[tidx, "Frequency"] = f/len(df)
+                    topo_df.at[tidx, "Frequency"] = (f/len(data))*100
                     topo_df.at[tidx, "Quantile"] = rank
                     tidx += 1
                     break
@@ -1719,6 +1735,56 @@ def plot_frequencies_topo_quantile(
 
 # ---------------------------------------------------------------------------------
 # -------------------------------- Whole Genome Graph Functions -------------------------------
+def build_whole_genome_alt_data_graph(
+    alt_data_to_graph,
+    chromosome_df,
+    color_mapping,
+    topology_df,
+    window_size,
+    template,
+    y_max,
+    axis_line_width,
+    xaxis_gridlines,
+    yaxis_gridlines,
+    font_family,
+):
+    # Check input type and graph accordingly
+    try:
+        input_type = type(topology_df[alt_data_to_graph].dropna().to_list()[0])
+    except IndexError:
+        return no_data_graph(template)
+    if input_type == str:
+        alt_data_graph_data = make_alt_data_str_figure(
+            alt_data_to_graph,
+            chromosome_df,
+            color_mapping,
+            topology_df,
+            window_size,
+            template,
+            None,
+            axis_line_width,
+            xaxis_gridlines,
+            yaxis_gridlines,
+            font_family,
+            True,
+        )
+    else:
+        alt_data_graph_data = make_alt_data_int_figure(
+            alt_data_to_graph,
+            color_mapping,
+            topology_df,
+            chromosome_df,
+            template,
+            None,
+            y_max,
+            axis_line_width,
+            xaxis_gridlines,
+            yaxis_gridlines,
+            font_family,
+            True,
+        )
+    return alt_data_graph_data
+
 
 def build_topology_frequency_pie_chart(
     df,
@@ -1775,6 +1841,7 @@ def build_rf_graph(
 def build_whole_genome_rug_plot(
     df,
     chrom_df,
+    chrom_order,
     chromGroup,
     template,
     color_mapping,
@@ -1790,10 +1857,13 @@ def build_whole_genome_rug_plot(
     df = df[(df['TopologyID'].isin(currTopologies)) & (df['Chromosome'].isin(chromGroup))]
     grouped_topology_df = df.groupby(by='TopologyID')
     num_chroms = len(df['Chromosome'].unique())
-    chrom_row_dict = {chrom:i for chrom, i in zip(sorted(df['Chromosome'].unique()), range(1, len(df['Chromosome'].unique())+1, 1))}
+    chrom_row_dict = {chrom:i for chrom, i in zip(chrom_order, range(1, len(df['Chromosome'].unique())+1, 1))}
     chrom_shapes = []
-    row_height = [2]*num_chroms
+    row_height = [1]*num_chroms
     # --- Build figure ---
+    if len(df) > 40000:
+        fig = no_tree_data(template, "Too many data points to plot")
+        return fig
     # If chromosome name longer than 5 characters, use subplot titles 
     # instead of row ittles
     if df.Chromosome.map(len).max() > 5:
@@ -1889,139 +1959,91 @@ def build_whole_genome_rug_plot(
 
     # Update layout + axes
     fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+    if wg_squish_expand == 'expand':
+        fig.update_layout(
+            template=template,
+            legend_title_text='Topology',
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                traceorder='normal',
+                itemsizing='constant',
+            ),
+            margin=dict(
+                t=20,
+                b=30,
+            ),
+            height=100*num_chroms,
+            shapes=chrom_shapes,
+            title_x=0.5,
+            font=dict(family=font_family,),
+        )
+    elif wg_squish_expand == 'squish':
+        fig.update_layout(
+            template=template,
+            legend_title_text='Topology',
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                traceorder='normal',
+                itemsizing='constant',
+            ),
+            margin=dict(
+                t=20,
+                b=30,
+            ),
+            height=50*num_chroms,
+            shapes=chrom_shapes,
+            title_x=0.5,
+            font=dict(family=font_family,),
+        )
+    else:
+        fig.update_layout(
+            template=template,
+            legend_title_text='Topology',
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                traceorder='normal',
+                itemsizing='constant',
+            ),
+            # height=25*num_chroms,
+            height=40+(20*num_chroms),
+            shapes=chrom_shapes,
+            title_x=0.5,
+            margin=dict(
+                t=20,
+                b=30,
+            ),
+            font=dict(family=font_family,),
+        )
     fig.update_xaxes(
         rangemode="tozero",
-        range=[0, (chrom_df['End'].max()+(2*window_size))],
-        fixedrange=True,
+        range=[0, chrom_df['End'].max()],
+        # fixedrange=True,
         linewidth=axis_line_width,
-        ticklen=0,
-        matches="x",
+        matches=None,
         showgrid=xaxis_gridlines,
     )
     fig.update_yaxes(
         fixedrange=True,
+        range=[-1, len(topoOrder)],
         title="",
         showgrid=yaxis_gridlines,
         showticklabels=False,
+        ticklen=0,
         linewidth=axis_line_width,
         categoryarray=topoOrder,
     )
-    if wg_squish_expand == 'expand':
-        if num_chroms < 5:
-            fig.update_layout(
-                template=template,
-                legend_title_text='Topology',
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="left",
-                    x=0,
-                    traceorder='normal',
-                    itemsizing='constant',
-                ),
-                height=160*num_chroms,
-                shapes=chrom_shapes,
-                title_x=0.5,
-                font=dict(family=font_family,),
-            )
-        else:
-            fig.update_layout(
-                template=template,
-                legend_title_text='Topology',
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="left",
-                    x=0,
-                    traceorder='normal',
-                    itemsizing='constant',
-                ),
-                height=100*num_chroms,
-                shapes=chrom_shapes,
-                title_x=0.5,
-                font=dict(family=font_family,),
-            )
-    elif wg_squish_expand == 'squish':
-        if num_chroms < 5:
-            fig.update_layout(
-                template=template,
-                legend_title_text='Topology',
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="left",
-                    x=0,
-                    traceorder='normal',
-                    itemsizing='constant',
-                ),
-                height=125*num_chroms,
-                shapes=chrom_shapes,
-                title_x=0.5,
-                font=dict(family=font_family,),
-            )
-        else:
-            fig.update_layout(
-                template=template,
-                legend_title_text='Topology',
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="left",
-                    x=0,
-                    traceorder='normal',
-                    itemsizing='constant',
-                ),
-                height=50*num_chroms,
-                shapes=chrom_shapes,
-                title_x=0.5,
-                font=dict(family=font_family,),
-            )
-    else:
-        if num_chroms < 5:
-            fig.update_layout(
-                template=template,
-                legend_title_text='Topology',
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="left",
-                    x=0,
-                    traceorder='normal',
-                    itemsizing='constant',
-                ),
-                height=105*num_chroms,
-                shapes=chrom_shapes,
-                title_x=0.5,
-                font=dict(family=font_family,),
-            )
-        else:
-            fig.update_layout(
-                template=template,
-                legend_title_text='Topology',
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="left",
-                    x=0,
-                    traceorder='normal',
-                    itemsizing='constant',
-                ),
-                height=20*num_chroms,
-                shapes=chrom_shapes,
-                title_x=0.5,
-                margin=dict(
-                    t=10,
-                    b=30,
-                ),
-                font=dict(family=font_family,),
-            )
-    
     # Rotate chromosome names to 0-degrees
     for annotation in fig['layout']['annotations']: 
         annotation['textangle']=0
@@ -2032,6 +2054,7 @@ def build_whole_genome_rug_plot(
 def build_whole_genome_tile_plot(
     df,
     chrom_df,
+    chrom_order,
     template,
     color_mapping,
     currTopologies,
@@ -2054,9 +2077,12 @@ def build_whole_genome_tile_plot(
     df = df[df['Chromosome'].isin(chromGroup)]
     grouped_topology_df = df.groupby(by='TopologyID')
     num_chroms = len(df['Chromosome'].unique())
-    chrom_row_dict = {chrom:i for chrom, i in zip(sorted(df['Chromosome'].unique()), range(1, len(df['Chromosome'].unique())+1, 1))}
+    chrom_row_dict = {chrom:i for chrom, i in zip(chrom_order, range(1, len(chrom_order)+1, 1))}
     chrom_shapes = []
     # --- Build figure ---
+    if len(df) > 40000:
+        fig = no_tree_data(template, "Too many data points to plot")
+        return fig
     # If longest chromosome name longer 
     # than 5 characters, use subplot titles 
     # instead of row titles
@@ -2066,7 +2092,7 @@ def build_whole_genome_tile_plot(
             cols=1,
             shared_xaxes=True,
             subplot_titles=chrom_row_dict.keys(),
-            vertical_spacing=0.03, 
+            vertical_spacing=0.03,
         )
     else:
         fig = make_subplots(
@@ -2118,30 +2144,30 @@ def build_whole_genome_tile_plot(
     if wg_squish_expand == 'expand':
         if num_chroms < 5:
                 fig.update_layout(
-                barmode="relative",
-                template=template,
-                legend_title_text='Topology',
-                margin=dict(
-                    l=60,
-                    r=50,
-                    b=40,
-                    t=40,
-                ),
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="left",
-                    x=0,
-                    traceorder='normal',
-                    itemsizing='constant',
-                ),
-                hovermode="x unified",
-                height=130*num_chroms,
-                shapes=chrom_shapes,
-                title_x=0.5,
-                font=dict(family=font_family,),
-            )
+                    barmode="relative",
+                    template=template,
+                    legend_title_text='Topology',
+                    margin=dict(
+                        l=60,
+                        r=50,
+                        b=40,
+                        t=40,
+                    ),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="left",
+                        x=0,
+                        traceorder='normal',
+                        itemsizing='constant',
+                    ),
+                    hovermode="x unified",
+                    height=125*num_chroms,
+                    shapes=chrom_shapes,
+                    title_x=0.5,
+                    font=dict(family=font_family,),
+                )
         else:
             fig.update_layout(
                 barmode="relative",
@@ -2190,7 +2216,7 @@ def build_whole_genome_tile_plot(
                     itemsizing='constant',
                 ),
                 hovermode="x unified",
-                height=80*num_chroms,
+                height=75*num_chroms,
                 shapes=chrom_shapes,
                 title_x=0.5,
                 font=dict(family=font_family,),
@@ -2222,58 +2248,30 @@ def build_whole_genome_tile_plot(
                 font=dict(family=font_family,),
             )
     else:
-        if num_chroms < 5:
-            fig.update_layout(
-                barmode="relative",
-                template=template,
-                legend_title_text='Topology',
-                margin=dict(
-                    l=60,
-                    r=50,
-                    b=40,
-                    t=40,
-                ),
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="left",
-                    x=0,
-                    traceorder='normal',
-                    itemsizing='constant',
-                ),
-                hovermode="x unified",
-                height=55*num_chroms,
-                shapes=chrom_shapes,
-                title_x=0.5,
-                font=dict(family=font_family,),
-            )
-        else: 
-            fig.update_layout(
-                barmode="relative",
-                template=template,
-                legend_title_text='Topology',
-                margin=dict(
-                    l=60,
-                    r=50,
-                    b=40,
-                    t=40,
-                ),
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="left",
-                    x=0,
-                    traceorder='normal',
-                    itemsizing='constant',
-                ),
-                hovermode="x unified",
-                height=20*num_chroms,
-                shapes=chrom_shapes,
-                title_x=0.5,
-                font=dict(family=font_family,),
-            )
+        fig.update_layout(
+            barmode="relative",
+            template=template,
+            legend_title_text='Topology',
+            margin=dict(
+                t=20,
+                b=30,
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0,
+                traceorder='normal',
+                itemsizing='constant',
+            ),
+            hovermode="x unified",
+            height=40+(20*num_chroms),
+            shapes=chrom_shapes,
+            title_x=0.5,
+            font=dict(family=font_family,),
+        )
+
     fig.update_xaxes(
         linewidth=axis_line_width,
         fixedrange=True,
@@ -2301,11 +2299,12 @@ def build_whole_genome_tile_plot(
 
 def build_whole_genome_bar_plot(
     df,
+    chrom_order,
+    chromGroup,
     template,
     color_mapping,
     currTopologies,
     axis_line_width,
-    chromGroup,
     xaxis_gridlines,
     yaxis_gridlines,
     font_family,
@@ -2318,9 +2317,10 @@ def build_whole_genome_bar_plot(
         df,
         x='TopologyID',
         y='Frequency',
+        category_orders={"Chromosome": chrom_order},
         facet_col='Chromosome',
         facet_col_wrap=3,
-        facet_row_spacing=0.05,
+        facet_row_spacing=0.025,
         color='TopologyID',
         template=template,
         color_discrete_map=color_mapping,
@@ -2343,7 +2343,7 @@ def build_whole_genome_bar_plot(
             x=0,
             traceorder='normal',
         ),
-        margin=dict(l=10, r=10, t=10, b=10),
+        margin=dict(l=40, r=40, t=40, b=40),
         title="",
         annotations = list(fig.layout.annotations) + 
         [go.layout.Annotation(
@@ -2379,6 +2379,7 @@ def build_whole_genome_bar_plot(
 
 def build_whole_genome_pie_charts(
     df,
+    chrom_order,
     template,
     color_mapping,
     chromGroup,
@@ -2393,21 +2394,28 @@ def build_whole_genome_pie_charts(
         cols=3,
         specs=specs,
         vertical_spacing=0.03,
-        horizontal_spacing=0.001,
-        subplot_titles=sorted(df["Chromosome"].unique()),
+        horizontal_spacing=0.0001,
+        subplot_titles=chrom_order,
         column_widths=[2]*3,
     )
     col_pos = 1
     row_num = 1
-    for c in sorted(df['Chromosome'].unique()):
+    for c in chrom_order:
         chrom_df = df[df["Chromosome"] == c]
-        fig.add_trace(go.Pie(labels=chrom_df["TopologyID"], values=chrom_df['Frequency'], marker_colors=list(color_mapping.values())), row=row_num, col=col_pos)
+        colors = [color_mapping[i] for i in chrom_df["TopologyID"]]
+        fig.add_trace(go.Pie(
+            labels=chrom_df["TopologyID"],
+            values=chrom_df['Frequency'],
+            marker_colors=colors,
+            ),
+            row=row_num,
+            col=col_pos,  
+        )
         if col_pos == 3:
             col_pos = 1
             row_num += 1
         else:
             col_pos += 1
-    
     fig.update_traces(textposition='inside')
     fig.update_layout(
         uniformtext_minsize=12, 
@@ -2418,6 +2426,10 @@ def build_whole_genome_pie_charts(
     )
     return fig
 
+
+def get_recommended_chrom_num(df_len):
+    """Divide len of DF by 500k"""
+    return int(500000 // df_len)
 
 # ---------------------------------------------------------------------------------
 # --------------------------- Stats DataFrame Generators --------------------------
@@ -2483,7 +2495,7 @@ def basic_stats_dfs(topology_df):
         return topo_freq_df, pd.DataFrame()
 
 
-def current_view_topo_freq_chart(basic_stats_topo_freqs, template, color_mapping):
+def current_view_topo_freq_chart(basic_stats_topo_freqs, template, color_mapping, current_view_title):
     """Return pie chart figure object for local topology frequencies
 
     :param basic_stats_topo_freqs: Dataframe of topology frequencies
@@ -2501,6 +2513,8 @@ def current_view_topo_freq_chart(basic_stats_topo_freqs, template, color_mapping
             text="Frequency",
         )
         fig.update_layout(
+            title=current_view_title,
+            title_x=0.5,
             template=template,
             uniformtext_minsize=12, 
             uniformtext_mode='hide',
@@ -2786,20 +2800,20 @@ def init_data_graph(template):
     fig = go.Figure()
     fig.update_layout(
         template=template,
-        annotations=[
-            dict(
-                name="draft watermark",
-                text="NO DATA LOADED",
-                textangle=0,
-                opacity=0.9,
-                font=dict(color="white", size=50),
-                xref="paper",
-                yref="paper",
-                x=0.5,
-                y=0.5,
-                showarrow=False,
-            )
-        ],
+        # annotations=[
+        #     dict(
+        #         name="draft watermark",
+        #         # text="NO DATA LOADED",
+        #         textangle=0,
+        #         opacity=0.9,
+        #         font=dict(color="white", size=50),
+        #         xref="paper",
+        #         yref="paper",
+        #         x=0.5,
+        #         y=0.5,
+        #         showarrow=False,
+        #     )
+        # ],
     )
     fig.update_xaxes(range=[0.2, 1], showgrid=False, visible=False, zeroline=False)
     fig.update_yaxes(range=[0.2, 1], showgrid=False, visible=False, zeroline=False)
@@ -2894,6 +2908,7 @@ def no_tree_data(template, msg):
     fig = go.Figure()
     fig.update_layout(
         template=template,
+        height=300,
         annotations=[
             dict(
                 name="draft watermark",
@@ -2925,7 +2940,7 @@ def zoom_in_gff(template):
         annotations=[
             dict(
                 name="draft watermark",
-                text="Zoom in to minimum 5Mb to view",
+                text="Zoom in to view - max 5Mb",
                 textangle=0,
                 opacity=0.9,
                 font=dict(color="white", size=25),
@@ -3086,6 +3101,32 @@ def tv_header_validation(df):
         return False
 
 
+def valid_gff_gtf(i):
+    """Ensure gff/gtf file has 9 columns of data
+
+    :param i: gff/gtf file
+    :type i: str
+    :return: True or False
+    :rtype: bool
+    """
+    try:
+        with open(i) as h:
+            for l in h.readlines():
+                if l[0] == "#":
+                    continue
+                else:
+                    length = len(l.strip().split("\t"))
+                    if length == 9:
+                        return True
+                    else:
+                        return False
+    except:
+        length = len(i.read().split("\n")[0].strip("\r").split("\t"))
+        if length == 9:
+            return True
+        else:
+            return False
+
 # ---------------------------------------------------------------------------------
 # --------------------------- Tree Prune Export Tools -----------------------------
 def prune_tree(x, prune_taxa_choices):
@@ -3173,7 +3214,7 @@ def tv_topobinner(df):
 
 def mygrouper(n, iterable):
     args = [iter(iterable)] * n
-    return ([e for e in t if e != None] for t in itertools.zip_longest(*args))
+    return list([e for e in t if e != None] for t in itertools.zip_longest(*args))
 
 
 def make_topo_freq_table(df_grouped):
@@ -3218,7 +3259,7 @@ def tree_viewer_template():
 
 
 def chrom_len_template():
-    content = pd.DataFrame({"Chromosome": ["chr1", "chr2", "chr3"], "Start": [0, 0, 0], "Stop": [1000000, 1500000, 2000000]})
+    content = pd.DataFrame({"Chromosome": ["chr1", "chr2", "chr3"], "Start": [0, 0, 0], "End": [1000000, 1500000, 2000000]})
     return content
 # ---------------------------------------------------------------------------------
 # ------------------------------- Misc. Functions ---------------------------------
@@ -3237,3 +3278,10 @@ def filter_numeric_dtypes(df):
         else:
             filtered_names.append(name)
     return filtered_names
+
+
+def sorted_nicely(l): 
+    """ Sort the given iterable in the way that humans expect.""" 
+    convert = lambda text: int(text) if text.isdigit() else text 
+    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
+    return sorted(l, key = alphanum_key)

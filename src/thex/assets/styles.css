@@ -270,9 +270,10 @@ margin-left: -1px;
     text-align: center;
     text-decoration: underline;
 }
+
 .tv-docs-content-text {
     color: black;
-    font-size: 13pt;
+    font-size: 12pt;
 }
 
 .tv-docs-header-links {
@@ -410,6 +411,7 @@ margin-left: -1px;
 
 .stats-2-graph-style {
     /* padding: 1px; */
+    /* height: 100%; */
 }
 
 .stats-chrom-freq-div {

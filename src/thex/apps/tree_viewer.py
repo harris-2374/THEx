@@ -349,16 +349,19 @@ tree_graph_toggle = daq.ToggleSwitch(
     size=30,
 )
 
-tree_styles = dcc.RadioItems(
+tree_styles = dbc.RadioItems(
     id='tree-shape',
+    className="btn-group",
+    inputClassName="btn-check",
+    labelClassName="btn-outline-secondary btn btn-sm",
+    labelCheckedClassName="active",
     options=[
         {'label': 'Rectangular', 'value': 'rectangle'},
         {'label': 'Circular', 'value': 'circle'},
         # {'label': 'Radial', 'value': 'radial'},
     ],
     value='rectangle',
-    labelStyle={'display': 'inline-block', 'marginLeft': '5px'},
-    style={'padding': '2px', 'marginLeft': '5px', 'color': 'black'},
+    style={'paddingBottom': '5px', 'color': 'black'},
 )
 
 topology_order_toggle = daq.ToggleSwitch(
@@ -387,29 +390,34 @@ quantile_graph_toggle = daq.ToggleSwitch(
 graph_switch_col1 = dbc.Form(
     children=[
         dbc.Label("Main Distribution Graph Options:", className="text-divs-sm"),
-        dbc.FormGroup([
-            dbc.Label("Type:", style={'color': 'black', 'paddingLeft': '15px'}),
+        dbc.Row([
+            dbc.Label("Type:", style={'color': 'black', 'paddingLeft': '15px'}, width='auto'),
             dbc.Col([
                 dbc.RadioItems(
                     id="main-graph-switches",
+                    className="btn-group",
+                    inputClassName="btn-check",
+                    labelClassName="btn btn-outline-secondary",
+                    labelCheckedClassName="active",
                     options=[
                         {'label': 'Rug+Tile', 'value': 'topo_both', 'disabled': True},
                         {'label': 'Rug', 'value': 'topo_rug_only', 'disabled': True},
                         {'label': 'Tile', 'value': 'topo_tile_only', 'disabled': True},
                     ],
                     value="topo_both",
-                    className="checklist-style",
-                    inline=True,
                 ),
-            ]),
-        ], row=True),
+            ], className="radio-group"),
+        ], style={"paddingBottom": "5px"}),
         dbc.Label("Whole Genome Graph Options:", className="text-divs-sm"),
-        dbc.FormGroup([
-            dbc.Label("Type:", style={'color': 'black', 'paddingLeft': '15px'}),
+        dbc.Row([
+            dbc.Label("Type:", style={'color': 'black', 'paddingLeft': '15px'}, width='auto'),
             dbc.Col([
                 dbc.RadioItems(
                     id='whole-genome-graph-type',
-                    className="dropdown-style",
+                    className="btn-group",
+                    inputClassName="btn-check",
+                    labelClassName="btn btn-outline-secondary",
+                    labelCheckedClassName="active",
                     options=[
                         {'label': 'Rug', 'value': 'rug', 'disabled': True},
                         {'label': 'Bar', 'value': 'bar', 'disabled': True},
@@ -417,37 +425,37 @@ graph_switch_col1 = dbc.Form(
                         {'label': 'Tile', 'value': 'tile', 'disabled': True},
                     ],
                     value='rug',
-                    inline=True,
                 ),
-            ],),
-        ], row=True),
-        dbc.FormGroup([
-            dbc.Label("Height:", style={'color': 'black', 'paddingLeft': '15px'}),
+            ], className="radio-group"),
+        ], style={"paddingBottom": "5px"}),
+        dbc.Row([
+            dbc.Label("Height:", style={'color': 'black', 'paddingLeft': '15px'}, width='auto'),
             dbc.Col([
                 dbc.RadioItems(
                     id="wg-squish-expand",
-                    className="dropdown-style",
+                    className="btn-group",
+                    inputClassName="btn-check",
+                    labelClassName="btn btn-outline-secondary",
+                    labelCheckedClassName="active",
                     options=[
                         {'label': 'Collapse', 'value': 'collapse', 'disabled': True},
                         {'label': 'Squish', 'value': 'squish', 'disabled': True},
                         {'label': 'Expand', 'value': 'expand', 'disabled': True},
                     ],
-                    value='collapse',
-                    inline=True,
+                    value='squish',
                 ),
-            ]),
-        ], row=True),
-        dbc.FormGroup([
-            dbc.Label("# CHR per-graph:", style={'color': 'black', 'paddingLeft': '15px'}),
+            ], className="radio-group"),
+        ], style={"paddingBottom": "5px"}),
+        dbc.Row([
+            dbc.Label("# chr per graph:", style={'color': 'black', 'paddingLeft': '15px'}, width='auto'),
             dbc.Col([
                 dcc.Input(
                     id='whole-genome-per-graph-chrom-count',
                     type="number",
-                    value=20,
                     style={'width': '50px'},
                 ),
             ]),
-        ], row=True),
+        ], style={"paddingBottom": "5px"}),
     ],
 )
 
@@ -558,6 +566,8 @@ def tv_layout():
             
             # --- Triggers ---
             html.Div(id='main-div-trigger'),
+            html.Div(id='init-graph-trigger'),
+            html.Div(id='break-init-graph-trigger'),
             # --- Data Handoffs ---
             html.Div(id='gff-data-handoff', className="hidden-div"),
             # Empty DIVs for data chache
@@ -671,22 +681,23 @@ def tv_layout():
                                                                 html.P([
                                                                     """
                                                                     Choose a project ".ini" file to load all required and additional input files at once. This simplifies the input process
-                                                                    and allows for fast switching between data sets. Click the button below to download a template ".ini" project file
+                                                                    and allows for fast switching between data sets. Projects also enable users to upload and visualize multiple GFF/GTF files 
+                                                                    simultaneously by providing multiple file paths separated by ";". Click the button below to download a template ".ini" project file
                                                                     that follows the required file format.
                                                                     """,
                                                                 ], style={'text-align': 'left', 'color': 'black', 'font-size': '1em'}),
-                                                                html.P([
-                                                                    """
-                                                                    ** In Development ** 
-                                                                    """,
-                                                                ], style={'text-align': 'left', 'color': 'black', 'font-size': '1em'}),
-                                                                html.P([
-                                                                    """
-                                                                    Provided a project directory is given within the project ".ini" file, changes made during the session will be logged to the project directory.
-                                                                    This includes information about pruned files, current view export coordinates, and other important changes. No user specific information is logged,
-                                                                    including but not limited to absolute file pathways, enviorment information, or user computing information. 
-                                                                    """,
-                                                                ], style={'text-align': 'left', 'color': 'black', 'font-size': '1em'}),
+                                                                # html.P([
+                                                                #     """
+                                                                #     ** In Development ** 
+                                                                #     """,
+                                                                # ], style={'text-align': 'left', 'color': 'black', 'font-size': '1em'}),
+                                                                # html.P([
+                                                                #     """
+                                                                #     Provided a project directory is given within the project ".ini" file, changes made during the session will be logged to the project directory.
+                                                                #     This includes information about pruned files, current view export coordinates, and other important changes. No user specific information is logged,
+                                                                #     including but not limited to absolute file pathways, environment information, or user computing information. 
+                                                                #     """,
+                                                                # ], style={'text-align': 'left', 'color': 'black', 'font-size': '1em'}),
                                                             ]),
                                                             dbc.CardFooter([
                                                                 dbc.Button("Download project.ini Template", id='project-ini-download-button', color='primary')
@@ -1069,6 +1080,11 @@ def tv_layout():
                                             className="row-div",
                                             no_gutters=True,
                                         ),
+                                        dbc.Row([
+                                            dbc.Col([
+                                                dbc.Button("Apply Updates", id='update-options', color='primary', block=True),
+                                            ], width=12),
+                                        ]),
                                     ],
                                     className="narbar-collapse-plot-options",
                                 ),
@@ -1428,6 +1444,7 @@ def tv_layout():
                                                                             id="chromosome-options",
                                                                             className="dropdown-style",
                                                                             optionHeight=20,
+                                                                            clearable=False,
                                                                         ),
                                                                     ],
                                                                     className="home-tab-button-cols",
@@ -1475,7 +1492,7 @@ def tv_layout():
                                                                         html.H6([
                                                                             tree_graph_toggle,
                                                                         ], className="text-divs"),
-                                                                        tree_styles,
+                                                                        html.Div(tree_styles, className="radio-group"),
                                                                         dcc.Dropdown(
                                                                             id="tree-taxa-choices",
                                                                             className="dropdown-style",
@@ -1499,13 +1516,7 @@ def tv_layout():
                                                                                 type='number',
                                                                                 min=2,
                                                                                 step=1,
-                                                                                style={'margin-top': '1px', 'margin-right': '5px'}
-                                                                            ),
-                                                                            dbc.Button(
-                                                                                "Run",
-                                                                                id="quantile-run-button",
-                                                                                disabled=True,
-                                                                                size='sm',
+                                                                                style={'margin-top': '1px', 'margin-right': '2px'}
                                                                             ),
                                                                         ], style={'display': 'inline-flex', 'width': '100%'}),
                                                                     ], 
@@ -1547,6 +1558,11 @@ def tv_layout():
                                             className="nav-row-div",
                                             no_gutters=True,
                                         ),
+                                        dbc.Row([
+                                            dbc.Col([
+                                                dbc.Button("Apply Updates", id='update-options', color='primary', block=True),
+                                            ], width=12),
+                                        ]),
                                     ],
                                     className="narbar-collapse-toolbar",
                                 ),
@@ -1575,7 +1591,7 @@ def tv_layout():
                                         id="topologyGraph",
                                         figure=tree_utils.init_data_graph("plotly_dark"),
                                         className="topograph-style",
-                                        config=dict(displaylogo=False, doubleClick="autosize", displayModeBar=False),
+                                        config=dict(displaylogo=False, doubleClick="reset", displayModeBar=False),
                                     ),
                                     dcc.Loading(
                                         id="topology_graph_div",
@@ -1766,7 +1782,6 @@ def hide_graph_divs(
      Output("alt-graph-switches", "options"),
      Output("tree-graph-switch", "disabled"),
      Output("alt-data-switch", "disabled"),
-     Output("quantile-run-button", 'disabled'),
      Output("quantile-toggle", "disabled"),
      Output("n-quantiles", "disabled"),
      Output("whole-genome-graph-type", "options"),
@@ -1842,7 +1857,7 @@ def main_graph_button_options(
         gffOption,
     ]
     return (main_graph_options, additional_graph_options,
-            treeOption, altDataOption, quantileButton, quantileToggle,
+            treeOption, altDataOption, quantileToggle,
             quantileInput, wholeGenomeGraphsoptions, wholeGenomeGraphSizeoptions)
 
 
@@ -1937,6 +1952,10 @@ def upload_gff_file(
         _, content_string = gffContents.split(",")
         tvDecoded = base64.b64decode(content_string)
         if ("gff" in gffFilename) or ("gtf" in gffFilename):
+            try:
+                assert tree_utils.valid_gff_gtf(io.StringIO(tvDecoded.decode("utf-8")))
+            except AssertionError:
+                return False, None, gffFilename, "danger", True
             gffDF = pd.read_csv(
                 io.StringIO(tvDecoded.decode("utf-8")),
                 sep="\t",
@@ -1948,12 +1967,21 @@ def upload_gff_file(
             return False, [gffDF.to_json()], gffFilename, "success", False
         else:
             return True, None, gffFilename, "Please provide a valid GFF/GTF file", False
+    elif button_id == "gff-upload-data":
+        if tree_utils.validate_gff_gtf_filename(gffFilename):
+            return True, None, gffFilename, "success", False
+        else:
+            return True, None, gffFilename, "danger", False
     elif gffHandoff:
         # Currently this feature only takes 1 GFF/GTF file as input.
         # Future work should focus on allowing multiple files
         gffDFs = list()
         for i in gffHandoff:
             if ("gff" in i) or ("gtf" in i):
+                try:
+                    assert tree_utils.valid_gff_gtf(i)
+                except AssertionError:
+                    return False, None, gffFilename, "danger", True
                 file = Path(i).name
                 gffDF = pd.read_csv(
                     i,
@@ -2344,7 +2372,8 @@ def load_input_files(
             # Load file by suffix
             if "csv" in tvFilename:
                 # Assume that the user uploaded a CSV file
-                tvDF = pd.read_csv(tvFilename)
+                tvDF = pd.read_csv(tvFilename, comments="#")
+                tvDF.sort_values(by=["Chromosome", "Window"], inplace=True)
                 validated_tvDF = tree_utils.tv_header_validation(tvDF)
                 # If validated_DF returns False, raise error 
                 # indicating issue with input file 
@@ -2369,6 +2398,7 @@ def load_input_files(
                         treeTaxaOptions,
                         treeTaxaValues,
                         gffData,
+                        None,
                     ]
                 if len(tvDF.columns) == 4:
                     tvDF["None"] = [pd.NA]*len(tvDF)
@@ -2377,7 +2407,8 @@ def load_input_files(
                 pass
             elif "txt" in tvFilename:
                 # Assume that the user uploaded a CSV file
-                tvDF = pd.read_csv(io.StringIO(tvFilename, sep='\t'))
+                tvDF = pd.read_csv(io.StringIO(tvFilename, sep='\t'), comments="#")
+                tvDF.sort_values(by=["Chromosome", "Window"], inplace=True)
                 validated_tvDF = tree_utils.tv_header_validation(tvDF)
                 # If validated_DF returns False, raise error 
                 # indicating issue with input file 
@@ -2402,6 +2433,7 @@ def load_input_files(
                         treeTaxaOptions,
                         treeTaxaValues,
                         gffData,
+                        None,
                     ]
                 if len(tvDF.columns) == 4:
                     tvDF["None"] = [pd.NA]*len(tvDF)
@@ -2410,7 +2442,8 @@ def load_input_files(
                 pass
             elif "tsv" in tvFilename:
                 # Assume that the user uploaded a CSV file
-                tvDF = pd.read_csv(tvFilename, sep='\t')
+                tvDF = pd.read_csv(tvFilename, sep='\t', comments="#")
+                tvDF.sort_values(by=["Chromosome", "Window"], inplace=True)
                 validated_tvDF = tree_utils.tv_header_validation(tvDF)
                 # If validated_DF returns False, raise error 
                 # indicating issue with input file 
@@ -2435,6 +2468,7 @@ def load_input_files(
                         treeTaxaOptions,
                         treeTaxaValues,
                         gffData,
+                        None,
                     ]
                 if len(tvDF.columns) == 4:
                     tvDF["None"] = [pd.NA]*len(tvDF)
@@ -2444,6 +2478,7 @@ def load_input_files(
             elif "xls" in tvFilename:
                 # Assume that the user uploaded an excel file
                 tvDF = pd.read_excel(tvFilename, engine="openpyxl", comment="#")
+                tvDF.sort_values(by=["Chromosome", "Window"], inplace=True)
                 # validated_tvDF = tree_utils.validate_tree_viewer_input(tvDF)
                 validated_tvDF = tree_utils.tv_header_validation(tvDF)
                 # If validated_DF returns False, raise error 
@@ -2469,6 +2504,7 @@ def load_input_files(
                         treeTaxaOptions,
                         treeTaxaValues,
                         gffData,
+                        None,
                     ]
                 if len(tvDF.columns) == 4:
                     tvDF["None"] = [pd.NA]*len(tvDF)
@@ -2656,6 +2692,7 @@ def load_input_files(
             if "csv" in tvFileType:
                 # Assume that the user uploaded a CSV file
                 tvDF = pd.read_csv(io.StringIO(tvDecoded.decode("utf-8")))
+                tvDF.sort_values(by=["Chromosome", "Window"], inplace=True)
                 validated_tvDF = tree_utils.tv_header_validation(tvDF)
                 # If validated_DF returns False, raise error 
                 # indicating issue with input file 
@@ -2665,7 +2702,7 @@ def load_input_files(
                     chromButtonColor = 'warning'
                     tvWarningLabel = "WARNING: Tree Viewer file appears to be malformed. First four headers must be ['Chromosome', 'Window', 'NewickTree', 'TopologyID']"
                     return [
-                        tvDF,
+                        tvDF.to_json(),
                         chromDF,
                         modalOpen,
                         tvFilename,
@@ -2679,6 +2716,7 @@ def load_input_files(
                         treeTaxaOptions,
                         treeTaxaValues,
                         gffData,
+                        None,
                     ]
                 if len(tvDF.columns) == 4:
                     tvDF["None"] = [pd.NA]*len(tvDF)
@@ -2688,6 +2726,7 @@ def load_input_files(
             elif "txt" in tvFileType:
                 # Assume that the user uploaded a CSV file
                 tvDF = pd.read_csv(io.StringIO(tvDecoded.decode("utf-8")), sep='\t')
+                tvDF.sort_values(by=["Chromosome", "Window"], inplace=True)
                 validated_tvDF = tree_utils.tv_header_validation(tvDF)
                 # If validated_DF returns False, raise error 
                 # indicating issue with input file 
@@ -2697,7 +2736,7 @@ def load_input_files(
                     chromButtonColor = 'warning'
                     tvWarningLabel = "WARNING: Tree Viewer file appears to be malformed. First four headers must be ['Chromosome', 'Window', 'NewickTree', 'TopologyID']"
                     return [
-                        tvDF,
+                        tvDF.to_json(),
                         chromDF,
                         modalOpen,
                         tvFilename,
@@ -2711,6 +2750,7 @@ def load_input_files(
                         treeTaxaOptions,
                         treeTaxaValues,
                         gffData,
+                        None,
                     ]
                 if len(tvDF.columns) == 4:
                     tvDF["None"] = [pd.NA]*len(tvDF)
@@ -2720,6 +2760,7 @@ def load_input_files(
             elif "tsv" in tvFileType:
                 # Assume that the user uploaded a CSV file
                 tvDF = pd.read_csv(io.StringIO(tvDecoded.decode("utf-8")), sep='\t')
+                tvDF.sort_values(by=["Chromosome", "Window"], inplace=True)
                 validated_tvDF = tree_utils.tv_header_validation(tvDF)
                 # If validated_DF returns False, raise error 
                 # indicating issue with input file 
@@ -2729,7 +2770,7 @@ def load_input_files(
                     chromButtonColor = 'warning'
                     tvWarningLabel = "WARNING: Tree Viewer file appears to be malformed. First four headers must be ['Chromosome', 'Window', 'NewickTree', 'TopologyID']"
                     return [
-                        tvDF,
+                        tvDF.to_json(),
                         chromDF,
                         modalOpen,
                         tvFilename,
@@ -2743,6 +2784,7 @@ def load_input_files(
                         treeTaxaOptions,
                         treeTaxaValues,
                         gffData,
+                        None,
                     ]
                 if len(tvDF.columns) == 4:
                     tvDF["None"] = [pd.NA]*len(tvDF)
@@ -2752,7 +2794,7 @@ def load_input_files(
             elif "xls" in tvFileType:
                 # Assume that the user uploaded an excel file
                 tvDF = pd.read_excel(io.BytesIO(tvDecoded), engine="openpyxl", comment="#")
-                # validated_tvDF = tree_utils.validate_tree_viewer_input(tvDF)
+                tvDF.sort_values(by=["Chromosome", "Window"], inplace=True)
                 validated_tvDF = tree_utils.tv_header_validation(tvDF)
                 # If validated_DF returns False, raise error 
                 # indicating issue with input file 
@@ -2762,7 +2804,7 @@ def load_input_files(
                     chromButtonColor = 'warning'
                     tvWarningLabel = "WARNING: Tree Viewer file appears to be malformed. First four headers must be ['Chromosome', 'Window', 'NewickTree', 'TopologyID']"
                     return [
-                        tvDF,
+                        tvDF.to_json(),
                         chromDF,
                         modalOpen,
                         tvFilename,
@@ -2776,6 +2818,7 @@ def load_input_files(
                         treeTaxaOptions,
                         treeTaxaValues,
                         gffData,
+                        None,
                     ]
                 if len(tvDF.columns) == 4:
                     tvDF["None"] = [pd.NA]*len(tvDF)
@@ -2806,11 +2849,37 @@ def load_input_files(
 
             if "bed" in chromFileType:
                 # Assume that the user uploaded a CSV file
-                chromDF = pd.read_csv(
+                header = pd.read_csv(
                     io.StringIO(chromDecoded.decode("utf-8")),
                     sep="\t",
-                    names=["Chromosome", "Start", "End"],
+                    nrows=1
                 )
+                if [i for i in header] == ["Chromosome", "Start", "End"]:
+                    chromDF = pd.read_csv(
+                        io.StringIO(chromDecoded.decode("utf-8")),
+                        sep="\t",
+                    )
+                else:
+                    chromFilename = f"Invalid file - {chromFilename}"
+                    chromButtonColor = 'danger'
+                    tvWarningLabel = 'WARNING: Header appears malformed or missing'
+                    return [
+                        None,
+                        None,
+                        modalOpen,
+                        tvFilename,
+                        chromFilename,
+                        projectName,
+                        windowSize,
+                        tvButtonColor,
+                        chromButtonColor,
+                        projectButtonColor,
+                        tvWarningLabel, 
+                        treeTaxaOptions,
+                        treeTaxaValues,
+                        None,
+                        None,
+                    ]
                 pass
             else:
                 chromFilename = f"Invalid file type - {chromFilename}"
@@ -2975,9 +3044,10 @@ def set_chromosome_options(
         raise PreventUpdate
     else:
         df = pd.read_json(tv_input_json)
-        unique_chroms = df["Chromosome"].unique()
-        chromosome_options = sorted([{"label": i, "value": i} for i in sorted(
-            unique_chroms)], key=lambda i: (i["label"], i["value"]))
+        chromosome_options = sorted(
+            [{"label": i, "value": i} for i in tree_utils.sorted_nicely(df["Chromosome"].unique())],
+            key=lambda i: (i["label"], i["value"])
+        )
         chrom_val = chromosome_options[0]["value"]
         sex_chrom_val = chromosome_options[-1]["value"]
         return (
@@ -3159,6 +3229,58 @@ def set_alt_data_options(
                 numeric_alt_data_options, numeric_alt_data_options[0]["value"],
             )
 
+
+# Set init chroms per whole-genome graphs
+@app.callback(
+    Output("whole-genome-per-graph-chrom-count", "value"),
+    [Input("whole-genome-per-graph-chrom-count", "value"),
+     Input("input-data-upload", "children"),
+    ],
+)
+def set_whole_genome_chrom_count(chrom_count, tv_input_json):
+    if not tv_input_json:
+        raise PreventUpdate
+    elif not chrom_count:
+        df = pd.read_json(tv_input_json)
+        chrom_count = tree_utils.get_recommended_chrom_num(len(df)) 
+    return chrom_count
+
+
+# ---------------------- Relayout Data Handlers ----------------------
+@app.callback(
+    # Outputs
+    Output("init-graph-trigger", "children"),
+    # Inputs
+    [Input("input-data-upload", "children"),
+     Input("chromFile-data-upload", "children"),
+     Input("topology_options", "value"),
+    ],
+)
+def init_graph_building(
+    tv_input_json,
+    chromosome_lengths,
+    current_topologies,
+):
+    ctx = dash.callback_context
+    if not ctx.triggered:
+        button_id = None
+    else:
+        button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+    if not tv_input_json:
+        raise PreventUpdate
+    elif not chromosome_lengths:
+        raise PreventUpdate
+    elif not current_topologies:
+        raise PreventUpdate
+    elif button_id == "init-graph-trigger":
+        raise PreventUpdate
+    elif button_id == "topology_options":
+        raise PreventUpdate
+    else:
+        return True 
+
+
 # ---------------------- Relayout Data Handlers ----------------------
 @app.callback(
     # Outputs
@@ -3230,34 +3352,40 @@ def update_relayout(
      Output("additional-graphs-div", "children"),
      Output("topologyGraph", "config"),
     ],
-    # Inputs
-    [Input("input-data-upload", "children"),
-     Input("chromFile-data-upload", "children"),
-     Input("gff-data-upload", "children"),
-     Input("main-graph-switches", "value"),
-     Input("alt-graph-switches", "value"),
-     Input("alt_data_options", "value"),
-     Input("chromosome-options", "value"),
-     Input("topology_options", "value"),
-     Input("template-option", "value"),
-     Input("snapshot-file-option", "value"),
-     Input("topology-color-chart-store", "data"),
-     Input("topology-freq-order-store", "data"),
-     Input("window-size", "children"),
+    [Input("update-options", "n_clicks"),
      Input("current-data-range", "data"),
-     Input("main-input-modal", "is_open"),
-     Input("alt-data-switch", "value"),
-     Input("axis-line-width", "value"),
-     Input("tv-pixel-height", "value"),
-     Input("tv-pixel-width", "value"),
-     Input("axis-gridlines", "value"),
-     Input("editable-graph-option", "value"),
      Input("toggle-chrom-whole-genome", "value"),
-     Input("main-div-trigger", 'data'),
-     Input("font-family-option", "value"),
+    ],
+    # Inputs
+    [State("input-data-upload", "children"),
+     State("chromFile-data-upload", "children"),
+     State("gff-data-upload", "children"),
+     State("main-graph-switches", "value"),
+     State("alt-graph-switches", "value"),
+     State("alt_data_options", "value"),
+     State("chromosome-options", "value"),
+     State("topology_options", "value"),
+     State("template-option", "value"),
+     State("snapshot-file-option", "value"),
+     State("topology-color-chart-store", "data"),
+     State("topology-freq-order-store", "data"),
+     State("window-size", "children"),
+     State("main-input-modal", "is_open"),
+     State("alt-data-switch", "value"),
+     State("axis-line-width", "value"),
+     State("tv-pixel-height", "value"),
+     State("tv-pixel-width", "value"),
+     State("axis-gridlines", "value"),
+     State("editable-graph-option", "value"),
+     State("main-div-trigger", 'data'),
+     State("font-family-option", "value"),
     ],
 )
 def home_tab_graphs(
+    update_options,
+    dataRange,
+    view_toggle,
+    #------------------
     tv_input_json,
     chromosome_length_data,
     gff_data,
@@ -3271,7 +3399,6 @@ def home_tab_graphs(
     color_mapping,
     topoOrder,
     window_size,
-    dataRange,
     input_modal_open,
     alt_data_switch,
     axis_line_width,
@@ -3279,16 +3406,12 @@ def home_tab_graphs(
     pixel_width,
     axis_gridlines,
     editable_graphs,
-    view_toggle,
     main_div_trigger,
     font_family,
 ):
     # -- Check context --
     ctx = dash.callback_context
-    if not ctx.triggered:
-        button_id = None
-    else:
-        button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+    button_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
     # -- Check to prevent update --
     if input_modal_open:
         raise PreventUpdate
@@ -3301,267 +3424,475 @@ def home_tab_graphs(
     elif not current_topologies:
         # If not topologies are selected, return No Data Loaded graph
         return [], None, None
-    # -- Run callback --
-    topoOrder = [e for e in topoOrder if e in current_topologies]
-    whole_tv_input_df = pd.read_json(tv_input_json)
-    chromosome_df = pd.read_json(chromosome_length_data)
-    chromosome_df["End"] = chromosome_df["End"].apply(lambda x: data_utils.roundUp(x, window_size))
-    tv_df = whole_tv_input_df[whole_tv_input_df["Chromosome"] == chromosome]
-    chromosome_df = chromosome_df[chromosome_df["Chromosome"] == chromosome]
-    dataMin, dataMax = dataRange
-    
-    # Set gridline bools
-    xaxis_gridlines, yaxis_gridlines = tree_utils.get_gridline_bools(axis_gridlines)
-    # Filter out data not within selected range
-    tv_df = tv_df.sort_values(by=["Chromosome", "Window", "TopologyID"])
-    tv_df = tv_df.reset_index(drop=True)
-    # -- Set editable value
-    editable_graphs = False if not editable_graphs else True
-    # --- Generate main distribution ---
-    topology_graphs = []
-    if button_id == "main-graph-switches":
-        main_div_trigger = 'trigger'
-    elif button_id == "topology_options":
-        main_div_trigger = 'trigger'
-    if not current_topologies:
-        pass
-    elif (not main_div_trigger) and (button_id != 'chromosome-options'):
-        topo_dist_graph = dash.no_update
-    else:
-        # Only keep data for selected topologies
-        tv_input_df_filtered = tv_df[tv_df["TopologyID"].isin(current_topologies)]
-        # Create figure depending on toggle-toolbar, add graph to output list
-        if "topo_rug_only" in main_graph_switches:
-            # Build histogram + Heatmap Figures
-            topo_dist_graph = tree_utils.build_rug_plot(
-                tv_input_df_filtered,
-                chromosome,
-                template,
-                current_topologies,
-                color_mapping,
-                dataRange,
-                topoOrder,
-                axis_line_width,
-                xaxis_gridlines,
-                yaxis_gridlines,
-                font_family,
-            )
-        elif "topo_tile_only" in main_graph_switches:
-            # Build histogram + Heatmap Figures
-            topo_dist_graph = tree_utils.build_tile_plot(
-                tv_input_df_filtered,
-                chromosome_df,
-                template,
-                current_topologies,
-                color_mapping,
-                dataRange,
-                window_size,
-                axis_line_width,
-                xaxis_gridlines,
-                yaxis_gridlines,
-                font_family,
-            )
+    elif (button_id == 'update-options') or (button_id == 'current-data-range'):
+        # -- Run callback --
+        topoOrder = [e for e in topoOrder if e in current_topologies]
+        whole_tv_input_df = pd.read_json(tv_input_json)
+        chromosome_df = pd.read_json(chromosome_length_data)
+        chromosome_df["End"] = chromosome_df["End"].apply(lambda x: data_utils.roundUp(x, window_size))
+        tv_df = whole_tv_input_df[whole_tv_input_df["Chromosome"] == chromosome]
+        chromosome_df = chromosome_df[chromosome_df["Chromosome"] == chromosome]
+        dataMin, dataMax = dataRange
+        
+        # Set gridline bools
+        xaxis_gridlines, yaxis_gridlines = tree_utils.get_gridline_bools(axis_gridlines)
+        # Filter out data not within selected range
+        tv_df = tv_df.sort_values(by=["Chromosome", "Window", "TopologyID"])
+        tv_df = tv_df.reset_index(drop=True)
+        # -- Set editable value
+        editable_graphs = False if not editable_graphs else True
+        # --- Generate main distribution ---
+        topology_graphs = []
+        if button_id == "main-graph-switches":
+            main_div_trigger = 'trigger'
+        elif button_id == "topology_options":
+            main_div_trigger = 'trigger'
+        elif button_id == "update-options":
+            main_div_trigger = 'trigger'
+        if not current_topologies:
+            pass
+        elif (not main_div_trigger) and (button_id != 'chromosome-options'):
+            topo_dist_graph = dash.no_update
         else:
-            # Build histogram + Heatmap Figures
-            topo_dist_graph = tree_utils.build_histogram_with_rug_plot(
-                tv_input_df_filtered,
-                chromosome,
-                chromosome_df,
-                template,
-                current_topologies,
-                window_size,
-                color_mapping,
-                dataRange,
-                topoOrder,
-                axis_line_width,
-                xaxis_gridlines,
-                yaxis_gridlines,
-                font_family,
-            )
+            # Only keep data for selected topologies
+            tv_input_df_filtered = tv_df[tv_df["TopologyID"].isin(current_topologies)]
+            # Create figure depending on toggle-toolbar, add graph to output list
+            if "topo_rug_only" in main_graph_switches:
+                # Build histogram + Heatmap Figures
+                topo_dist_graph = tree_utils.build_rug_plot(
+                    tv_input_df_filtered,
+                    chromosome,
+                    template,
+                    current_topologies,
+                    color_mapping,
+                    dataRange,
+                    topoOrder,
+                    axis_line_width,
+                    xaxis_gridlines,
+                    yaxis_gridlines,
+                    font_family,
+                )
+            elif "topo_tile_only" in main_graph_switches:
+                # Build histogram + Heatmap Figures
+                topo_dist_graph = tree_utils.build_tile_plot(
+                    tv_input_df_filtered,
+                    chromosome_df,
+                    template,
+                    current_topologies,
+                    color_mapping,
+                    dataRange,
+                    window_size,
+                    axis_line_width,
+                    xaxis_gridlines,
+                    yaxis_gridlines,
+                    font_family,
+                )
+            else:
+                # Build histogram + Heatmap Figures
+                topo_dist_graph = tree_utils.build_histogram_with_rug_plot(
+                    tv_input_df_filtered,
+                    chromosome,
+                    chromosome_df,
+                    template,
+                    current_topologies,
+                    window_size,
+                    color_mapping,
+                    dataRange,
+                    topoOrder,
+                    axis_line_width,
+                    xaxis_gridlines,
+                    yaxis_gridlines,
+                    font_family,
+                )
 
-    # --- Generate alternative data graphs ---
-    if not alt_data_switch:
-        pass
-    else:
-        alt_dropdown_options = [alt_dropdown_options] if type(alt_dropdown_options) == str else alt_dropdown_options
-        # Collect y-max from additional int/float data
-        y_maxes = tree_utils.get_y_max_list(alt_dropdown_options, tv_df)
-        # Generate graphs
-        for y_max, alt_data_option in zip(y_maxes, alt_dropdown_options):
-            alt_graph = tree_utils.build_alt_data_graph(
-                alt_data_option,
-                chromosome_df,
-                color_mapping,
-                tv_df,
-                window_size,
-                template,
-                dataRange,
-                y_max,
-                axis_line_width,
-                xaxis_gridlines,
-                yaxis_gridlines,
-                font_family,
-            )
-            topology_graphs.append(
-                html.Div(
-                    dcc.Graph(
-                        figure=alt_graph,
-                        config=dict(
-                            editable=True,
-                            displaylogo=False,
-                            doubleClick="reset",
-                            modeBarButtonsToRemove=[
-                                # "zoomIn2d",
-                                # "zoomOut2d",
-                                "autoScale2d",
-                                "lasso2d",
-                                "select2d",
-                            ],
-                            toImageButtonOptions=dict(
-                                format=snapshot_file_type,
-                                filename=f"{alt_data_option}",
+        # --- Generate alternative data graphs ---
+        if not alt_data_switch:
+            pass
+        else:
+            alt_dropdown_options = [alt_dropdown_options] if type(alt_dropdown_options) == str else alt_dropdown_options
+            # Collect y-max from additional int/float data
+            y_maxes = tree_utils.get_y_max_list(alt_dropdown_options, tv_df)
+            # Generate graphs
+            for y_max, alt_data_option in zip(y_maxes, alt_dropdown_options):
+                alt_graph = tree_utils.build_alt_data_graph(
+                    alt_data_option,
+                    chromosome_df,
+                    color_mapping,
+                    tv_df,
+                    window_size,
+                    template,
+                    dataRange,
+                    y_max,
+                    axis_line_width,
+                    xaxis_gridlines,
+                    yaxis_gridlines,
+                    font_family,
+                )
+                topology_graphs.append(
+                    html.Div(
+                        dcc.Graph(
+                            figure=alt_graph,
+                            config=dict(
+                                editable=True,
+                                displaylogo=False,
+                                doubleClick="reset",
+                                showAxisDragHandles=True,
+                                showAxisRangeEntryBoxes=True,
+                                modeBarButtonsToRemove=[
+                                    # "zoomIn2d",
+                                    # "zoomOut2d",
+                                    "autoScale2d",
+                                    "lasso2d",
+                                    "select2d",
+                                ],
+                                toImageButtonOptions=dict(
+                                    format=snapshot_file_type,
+                                    filename=f"{alt_data_option}",
+                                ),
                             ),
-                        ),
-                        className="alt-data-graph",
+                            className="alt-data-graph",
+                        )
                     )
                 )
-            )
 
-    # --- Generate GFF graph ---
-    if not alt_graph_switches:
-        pass
-    else:
-        for graph in alt_graph_switches:
-            if graph == "gff_switch":
-                for gff_json in gff_data:
-                    try:
-                        gff_df = pd.read_json(gff_json)
-                    except ValueError:
-                        raise PreventUpdate
-                    # gff_df = gff_df[(gff_df["start"] >= dataMin) & (gff_df["end"] <= dataMax) & (gff_df["chromosome"] == chromosome)]
-                    gff_df = gff_df[(gff_df["chromosome"] == chromosome)]
-                    if abs(dataMin - dataMax) > 50000000:
-                        topology_graphs.append(
-                            html.Div(
-                                children=[
-                                    dcc.Graph(
-                                        id="gff_graph",
-                                        figure=tree_utils.zoom_in_gff(template),
-                                        className="gff-style",
-                                        config=dict(
-                                            displayModeBar=False,
-                                        ),
-                                    ),
-                                ],
-                            )
-                        )
-                    elif len(gff_df) == 0:
-                        topology_graphs.append(
-                            html.Div(
-                                children=[
-                                    dcc.Graph(
-                                        id="gff_graph",
-                                        figure=tree_utils.no_tree_data(template, "No data in region"),
-                                        className="gff-style",
-                                        config=dict(
-                                            displayModeBar=False,
-                                        ),
-                                    ),
-                                ],
-                            )
-                        )
-                    else:
-                        gff_figure = tree_utils.build_gff_figure(
-                            gff_df,
-                            dataRange,
-                            template,
-                            axis_line_width,
-                            xaxis_gridlines,
-                            yaxis_gridlines,
-                            font_family,
-                        )
-                        topology_graphs.append(
-                            html.Div(
-                                children=[
-                                    dcc.Graph(
-                                        id="gff_graph",
-                                        figure=gff_figure,
-                                        config=dict(
-                                            editable=editable_graphs,
-                                            displaylogo=False,
-                                            doubleClick="autosize",
-                                            modeBarButtonsToRemove=[
-                                                "resetScale2d",
-                                                "lasso2d",
-                                                "select2d",
-                                            ],
-                                            toImageButtonOptions=dict(
-                                                format=snapshot_file_type,
-                                                filename="Graph_Name",
-                                                height=200,
-                                                width=1500,
+        # --- Generate GFF graph ---
+        if not alt_graph_switches:
+            pass
+        else:
+            for graph in alt_graph_switches:
+                if graph == "gff_switch":
+                    for gff_json in gff_data:
+                        try:
+                            gff_df = pd.read_json(gff_json)
+                        except ValueError:
+                            raise PreventUpdate
+                        # gff_df = gff_df[(gff_df["start"] >= dataMin) & (gff_df["end"] <= dataMax) & (gff_df["chromosome"] == chromosome)]
+                        gff_df = gff_df[(gff_df["chromosome"] == chromosome)]
+                        if abs(dataMin - dataMax) > 50000000:
+                            topology_graphs.append(
+                                html.Div(
+                                    children=[
+                                        dcc.Graph(
+                                            id="gff_graph",
+                                            figure=tree_utils.zoom_in_gff(template),
+                                            className="gff-style",
+                                            config=dict(
+                                                displayModeBar=False,
                                             ),
                                         ),
-                                        className="gff-style",
-                                    ),
-                                ],
+                                    ],
+                                )
                             )
+                        elif len(gff_df) == 0:
+                            topology_graphs.append(
+                                html.Div(
+                                    children=[
+                                        dcc.Graph(
+                                            id="gff_graph",
+                                            figure=tree_utils.no_tree_data(template, "No data in region"),
+                                            className="gff-style",
+                                            config=dict(
+                                                displayModeBar=False,
+                                            ),
+                                        ),
+                                    ],
+                                )
+                            )
+                        else:
+                            gff_figure = tree_utils.build_gff_figure(
+                                gff_df,
+                                dataRange,
+                                template,
+                                axis_line_width,
+                                xaxis_gridlines,
+                                yaxis_gridlines,
+                                font_family,
+                            )
+                            topology_graphs.append(
+                                html.Div(
+                                    children=[
+                                        dcc.Graph(
+                                            id="gff_graph",
+                                            figure=gff_figure,
+                                            config=dict(
+                                                editable=editable_graphs,
+                                                displaylogo=False,
+                                                doubleClick="autosize",
+                                                modeBarButtonsToRemove=[
+                                                    "resetScale2d",
+                                                    "lasso2d",
+                                                    "select2d",
+                                                ],
+                                                toImageButtonOptions=dict(
+                                                    format=snapshot_file_type,
+                                                    filename="Graph_Name",
+                                                    height=200,
+                                                    width=1500,
+                                                ),
+                                            ),
+                                            className="gff-style",
+                                        ),
+                                    ],
+                                )
+                            )
+
+        # --- Set configs ---
+        # Set pixel default
+        if (not pixel_height) or (not pixel_width):
+            pixel_width = 1500
+            pixel_height = 400
+
+        tv_main_dist_config = dict(
+            doubleClick="autosize",
+            displaylogo=False,
+            editable=editable_graphs,
+            modeBarButtonsToRemove=[
+                "resetScale2d",
+                "pan2d",
+                "lasso2d",
+                "select2d",
+                # "autoScale2d",
+            ],
+            toImageButtonOptions=dict(
+                format=snapshot_file_type,
+                filename="Graph_Name",
+                width=int(pixel_width),
+                height=int(pixel_height),
+            ),
+        )
+        return topo_dist_graph, topology_graphs, tv_main_dist_config
+    elif (view_toggle) and (button_id == "toggle-chrom-whole-genome"):
+        # -- Run callback --
+        topoOrder = [e for e in topoOrder if e in current_topologies]
+        whole_tv_input_df = pd.read_json(tv_input_json)
+        chromosome_df = pd.read_json(chromosome_length_data)
+        chromosome_df["End"] = chromosome_df["End"].apply(lambda x: data_utils.roundUp(x, window_size))
+        tv_df = whole_tv_input_df[whole_tv_input_df["Chromosome"] == chromosome]
+        chromosome_df = chromosome_df[chromosome_df["Chromosome"] == chromosome]
+        dataMin, dataMax = dataRange
+        # Set gridline bools
+        xaxis_gridlines, yaxis_gridlines = tree_utils.get_gridline_bools(axis_gridlines)
+        # Filter out data not within selected range
+        tv_df = tv_df.sort_values(by=["Chromosome", "Window", "TopologyID"])
+        tv_df = tv_df.reset_index(drop=True)
+        tv_input_df_filtered = tv_df[tv_df["TopologyID"].isin(current_topologies)]
+        # -- Set editable value
+        editable_graphs = False if not editable_graphs else True
+        # --- Generate main distribution ---
+        topo_dist_graph = tree_utils.build_histogram_with_rug_plot(
+                tv_input_df_filtered,
+                chromosome,
+                chromosome_df,
+                template,
+                current_topologies,
+                window_size,
+                color_mapping,
+                dataRange,
+                topoOrder,
+                axis_line_width,
+                xaxis_gridlines,
+                yaxis_gridlines,
+                font_family,
+            )
+        # --- Generate alternative data graphs ---
+        topology_graphs = []
+        if not alt_data_switch:
+            pass
+        else:
+            alt_dropdown_options = [alt_dropdown_options] if type(alt_dropdown_options) == str else alt_dropdown_options
+            # Collect y-max from additional int/float data
+            y_maxes = tree_utils.get_y_max_list(alt_dropdown_options, tv_df)
+            # Generate graphs
+            for y_max, alt_data_option in zip(y_maxes, alt_dropdown_options):
+                alt_graph = tree_utils.build_alt_data_graph(
+                    alt_data_option,
+                    chromosome_df,
+                    color_mapping,
+                    tv_df,
+                    window_size,
+                    template,
+                    dataRange,
+                    y_max,
+                    axis_line_width,
+                    xaxis_gridlines,
+                    yaxis_gridlines,
+                    font_family,
+                )
+                topology_graphs.append(
+                    html.Div(
+                        dcc.Graph(
+                            figure=alt_graph,
+                            config=dict(
+                                editable=True,
+                                displaylogo=False,
+                                doubleClick="reset",
+                                showAxisDragHandles=True,
+                                showAxisRangeEntryBoxes=True,
+                                modeBarButtonsToRemove=[
+                                    # "zoomIn2d",
+                                    # "zoomOut2d",
+                                    "autoScale2d",
+                                    "lasso2d",
+                                    "select2d",
+                                ],
+                                toImageButtonOptions=dict(
+                                    format=snapshot_file_type,
+                                    filename=f"{alt_data_option}",
+                                ),
+                            ),
+                            className="alt-data-graph",
                         )
+                    )
+                )
 
-    # --- Set configs ---
-    # Set pixel default
-    if (not pixel_height) or (not pixel_width):
-        pixel_width = 1500
-        pixel_height = 400
+        # --- Generate GFF graph ---
+        if not alt_graph_switches:
+            pass
+        else:
+            for graph in alt_graph_switches:
+                if graph == "gff_switch":
+                    for gff_json in gff_data:
+                        try:
+                            gff_df = pd.read_json(gff_json)
+                        except ValueError:
+                            raise PreventUpdate
+                        # gff_df = gff_df[(gff_df["start"] >= dataMin) & (gff_df["end"] <= dataMax) & (gff_df["chromosome"] == chromosome)]
+                        gff_df = gff_df[(gff_df["chromosome"] == chromosome)]
+                        if abs(dataMin - dataMax) > 50000000:
+                            topology_graphs.append(
+                                html.Div(
+                                    children=[
+                                        dcc.Graph(
+                                            id="gff_graph",
+                                            figure=tree_utils.zoom_in_gff(template),
+                                            className="gff-style",
+                                            config=dict(
+                                                displayModeBar=False,
+                                            ),
+                                        ),
+                                    ],
+                                )
+                            )
+                        elif len(gff_df) == 0:
+                            topology_graphs.append(
+                                html.Div(
+                                    children=[
+                                        dcc.Graph(
+                                            id="gff_graph",
+                                            figure=tree_utils.no_tree_data(template, "No data in region"),
+                                            className="gff-style",
+                                            config=dict(
+                                                displayModeBar=False,
+                                            ),
+                                        ),
+                                    ],
+                                )
+                            )
+                        else:
+                            gff_figure = tree_utils.build_gff_figure(
+                                gff_df,
+                                dataRange,
+                                template,
+                                axis_line_width,
+                                xaxis_gridlines,
+                                yaxis_gridlines,
+                                font_family,
+                            )
+                            topology_graphs.append(
+                                html.Div(
+                                    children=[
+                                        dcc.Graph(
+                                            id="gff_graph",
+                                            figure=gff_figure,
+                                            config=dict(
+                                                editable=editable_graphs,
+                                                displaylogo=False,
+                                                doubleClick="autosize",
+                                                modeBarButtonsToRemove=[
+                                                    "resetScale2d",
+                                                    "lasso2d",
+                                                    "select2d",
+                                                ],
+                                                toImageButtonOptions=dict(
+                                                    format=snapshot_file_type,
+                                                    filename="Graph_Name",
+                                                    height=200,
+                                                    width=1500,
+                                                ),
+                                            ),
+                                            className="gff-style",
+                                        ),
+                                    ],
+                                )
+                            )
 
-    tv_main_dist_config = dict(
-        doubleClick="autosize",
-        displaylogo=False,
-        editable=editable_graphs,
-        modeBarButtonsToRemove=[
-            "resetScale2d",
-            "pan2d",
-            "lasso2d",
-            "select2d",
-            # "autoScale2d",
-        ],
-        toImageButtonOptions=dict(
-            format=snapshot_file_type,
-            filename="Graph_Name",
-            width=int(pixel_width),
-            height=int(pixel_height),
-        ),
-    )
-    return topo_dist_graph, topology_graphs, tv_main_dist_config
+        # --- Set configs ---
+        # Set pixel default
+        if (not pixel_height) or (not pixel_width):
+            pixel_width = 1500
+            pixel_height = 400
+
+        tv_main_dist_config = dict(
+            doubleClick="autosize",
+            displaylogo=False,
+            editable=editable_graphs,
+            modeBarButtonsToRemove=[
+                "resetScale2d",
+                "pan2d",
+                "lasso2d",
+                "select2d",
+                # "autoScale2d",
+            ],
+            toImageButtonOptions=dict(
+                format=snapshot_file_type,
+                filename="Graph_Name",
+                width=int(pixel_width),
+                height=int(pixel_height),
+            ),
+        )
+        
+        return topo_dist_graph, topology_graphs, tv_main_dist_config
+    else:
+        raise PreventUpdate
 
 
 @app.callback(
     [Output("whole-genome-graphs", "children"),
      Output("whole-genome-alt-graphs", "children"),
+     Output("break-init-graph-trigger", "children"),
     ],
-    [Input("input-data-upload", "children"),
-     Input("chromFile-data-upload", "children"),
-     Input("template-option", "value"),
-     Input("topology-color-chart-store", "data"),
-     Input("whole-genome-graph-type", 'value'),
-     Input("topology-freq-order-store", "data"),
-     Input("topology_options", "value"),
-     Input("window-size", "children"),
-     Input("toggle-chrom-whole-genome", "value"),
-     Input("snapshot-file-option", "value"),
-     Input("axis-line-width", "value"),
-     Input("tv-pixel-height", "value"),
-     Input("tv-pixel-width", "value"),
-     Input("axis-gridlines", "value"),
-     Input("editable-graph-option", "value"),
-     Input("wg-squish-expand", 'value'),
-     Input("whole-genome-per-graph-chrom-count", "value"),
-     Input("font-family-option", "value"),
-     Input("alt-data-switch", "value"),
-     Input("alt_data_options", "value"),
+    [
+        Input("update-options", "n_clicks"),
+        Input("init-graph-trigger", "children"),
+        Input("toggle-chrom-whole-genome", "value"),
+    ],
+    [
+        State("input-data-upload", "children"),
+        State("chromFile-data-upload", "children"),
+        State("template-option", "value"),
+        State("topology-color-chart-store", "data"),
+        State("whole-genome-graph-type", 'value'),
+        State("topology-freq-order-store", "data"),
+        State("topology_options", "value"),
+        State("window-size", "children"),
+        State("snapshot-file-option", "value"),
+        State("axis-line-width", "value"),
+        State("tv-pixel-height", "value"),
+        State("tv-pixel-width", "value"),
+        State("axis-gridlines", "value"),
+        State("editable-graph-option", "value"),
+        State("wg-squish-expand", 'value'),
+        State("whole-genome-per-graph-chrom-count", "value"),
+        State("font-family-option", "value"),
+        State("alt-data-switch", "value"),
+        State("alt_data_options", "value"),
+        State("break-init-graph-trigger", "children"),
     ],
 )
 def whole_genome_plot(
+    update_options_btn,
+    init_graphs,
+    view_toggle,
     tv_input_json,
     chromosome_lengths,
     template,
@@ -3570,7 +3901,6 @@ def whole_genome_plot(
     topoOrder,
     current_topologies,
     window_size,
-    view_toggle,
     snapshot_file_type,
     axis_line_width,
     pixel_height,
@@ -3582,142 +3912,302 @@ def whole_genome_plot(
     font_family,
     alt_data_switch,
     alt_dropdown_options,
+    break_init,
 ):
+    
+    ctx = dash.callback_context
+    button_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
     # -- Check to prevent update --
     if view_toggle:
-        return None, None
+        raise PreventUpdate
     elif not tv_input_json:
         raise PreventUpdate
     elif not chromosome_lengths:
         raise PreventUpdate
     elif not current_topologies:
         raise PreventUpdate
-    # -- Run Callback --
-    # Set editable value
-    editable_graphs = False if not editable_graphs else True
-    # Read in json data
-    df = pd.read_json(tv_input_json)
-    chromosome_df = pd.read_json(chromosome_lengths)
-    # Filter out data not within selected range
-    df = df.sort_values(by=["Chromosome", "Window", "TopologyID"])
-    df = df.reset_index(drop=True)
-    # Set up graph config
-    if (not pixel_height) or (not pixel_width):
-        # pixel_width, pixel_height = 1500, 1123
-        config = dict(
-            doubleClick="autosize",
-            displaylogo=False,
-            editable=editable_graphs,
-            modeBarButtonsToRemove=[
-                "zoomin2D"
-                "autoScale2d",
-                "resetScale2d",
-                "pan2d",
-                "lasso2d",
-                "select2d",
-            ],
-            toImageButtonOptions=dict(
-                format=snapshot_file_type,
-                filename="Graph_Name",
-            ),
-        )
-    else:
-        config = dict(
-            doubleClick="autosize",
-            displaylogo=False,
-            editable=editable_graphs,
-            modeBarButtonsToRemove=[
-                "zoomin2D"
-                "autoScale2d",
-                "resetScale2d",
-                "pan2d",
-                "lasso2d",
-                "select2d",
-            ],
-            toImageButtonOptions=dict(
-                format=snapshot_file_type,
-                filename="Graph_Name",
-                width=int(pixel_width),
-                height=int(pixel_height),
-            ),
-        )
-    # Set gridline bools
-    xaxis_gridlines, yaxis_gridlines = tree_utils.get_gridline_bools(axis_gridlines)
-    df["GenomeFrequency"] = df["TopologyID"].map(df["TopologyID"].value_counts()/len(df))
-    df_grouped = df.groupby(by="Chromosome")
-    # Round up chromosome lengths for graph range
-    chromosome_df["End"] = chromosome_df["End"].apply(lambda x: data_utils.roundUp(x, window_size))
-    # Remove topologies not currently chosen
-    topoOrder = [e for e in topoOrder if e in current_topologies]
-    # Set whole genome graph collection list
-    whole_genome_graphs=[]
-    alt_data_graphs=[]
-    # Group Chromosomes into groups
-    chrom_groups = list(tree_utils.mygrouper(num_chroms_per_graph, df["Chromosome"].unique()))
-    if chrom_plot_type == 'bar':
-        topoFreqTable = tree_utils.make_topo_freq_table(df_grouped)
-        # Iterate through chromosome groups + append graph
-        for chromGroup in chrom_groups:
-            fig = tree_utils.build_whole_genome_bar_plot(
-                topoFreqTable,
-                template,
-                color_mapping,
-                current_topologies,
-                axis_line_width,
-                chromGroup,
-                xaxis_gridlines,
-                yaxis_gridlines,
-                font_family,
+    elif (button_id == 'update-options'):
+        # -- Set editable value --
+        editable_graphs = False if not editable_graphs else True
+        # -- Read in json data --
+        df = pd.read_json(tv_input_json)
+        chromosome_df = pd.read_json(chromosome_lengths)
+        sorted_chromosomes = tree_utils.sorted_nicely(chromosome_df['Chromosome'].unique())
+        # -- Set up graph config --
+        if (not pixel_height) or (not pixel_width):
+            # pixel_width, pixel_height = 1500, 1123
+            config_setting = dict(
+                doubleClick="reset",
+                displaylogo=False,
+                editable=editable_graphs,
+                modeBarButtonsToRemove=[
+                    "zoomin2D"
+                    "autoScale2d",
+                    # "resetScale2d",
+                    "pan2d",
+                    "lasso2d",
+                    "select2d",
+                ],
+                toImageButtonOptions=dict(
+                    format=snapshot_file_type,
+                    filename="Graph_Name",
+                ),
             )
-            whole_genome_graphs.append(
-                dbc.Col([
-                    dcc.Graph(
-                        figure=fig,
-                        config=config,
-                        className="stats-2-graph-style",
+        else:
+            config_setting = dict(
+                doubleClick="reset",
+                displaylogo=False,
+                editable=editable_graphs,
+                modeBarButtonsToRemove=[
+                    "zoomin2D"
+                    "autoScale2d",
+                    # "resetScale2d",
+                    "pan2d",
+                    "lasso2d",
+                    "select2d",
+                ],
+                toImageButtonOptions=dict(
+                    format=snapshot_file_type,
+                    filename="Graph_Name",
+                    width=int(pixel_width),
+                    height=int(pixel_height),
+                ),
+            )
+        # -- Set gridline bools --
+        xaxis_gridlines, yaxis_gridlines = tree_utils.get_gridline_bools(axis_gridlines)
+        df["GenomeFrequency"] = df["TopologyID"].map(df["TopologyID"].value_counts()/len(df))
+        df_grouped = df.groupby(by="Chromosome")
+        # -- Round up chromosome lengths for graph range --
+        chromosome_df["End"] = chromosome_df["End"].apply(lambda x: data_utils.roundUp(x, window_size))
+        # Remove topologies not currently chosen
+        topoOrder = [e for e in topoOrder if e in current_topologies]
+        # -- Set whole genome graph collection list --
+        whole_genome_graphs=[]
+        alt_data_graphs=[]
+        # -- Group Chromosomes into groups --
+        chrom_groups = tree_utils.mygrouper(num_chroms_per_graph, sorted_chromosomes)
+        if chrom_plot_type == 'bar':
+            topoFreqTable = tree_utils.make_topo_freq_table(df_grouped)
+            # Iterate through chromosome groups + append graph
+            for chromGroup in chrom_groups:
+                chrom_order = [i for i in sorted_chromosomes if i in chromGroup]
+                fig = tree_utils.build_whole_genome_bar_plot(
+                    topoFreqTable,
+                    chrom_order,
+                    chromGroup,
+                    template,
+                    color_mapping,
+                    current_topologies,
+                    axis_line_width,
+                    xaxis_gridlines,
+                    yaxis_gridlines,
+                    font_family,
+                )
+                whole_genome_graphs.append(
+                    html.Div([
+                        dcc.Graph(
+                            figure=fig,
+                            config=config_setting,
+                            className="stats-2-graph-style",
+                        )
+                    ])
+                )
+                continue
+        elif chrom_plot_type == 'pie':
+            topoFreqTable = tree_utils.make_topo_freq_table(df_grouped)
+            # Iterate through chromosome groups + append graph
+            for chromGroup in chrom_groups:
+                chrom_order = [i for i in sorted_chromosomes if i in chromGroup]
+                fig = tree_utils.build_whole_genome_pie_charts(
+                    topoFreqTable,
+                    chrom_order,
+                    template,
+                    color_mapping,
+                    chromGroup,
+                    font_family,
+                )
+                whole_genome_graphs.append(
+                    html.Div([
+                        dcc.Graph(
+                            figure=fig,
+                            config=config_setting,
+                            className="stats-2-graph-style",
+                        )
+                    ])
+                )
+                continue
+        elif chrom_plot_type == 'rug':
+            # Iterate through chromosome groups + append graph
+            for chromGroup in chrom_groups:
+                chrom_order = [i for i in sorted_chromosomes if i in chromGroup]
+                fig = tree_utils.build_whole_genome_rug_plot(
+                    df,
+                    chromosome_df,
+                    chrom_order,
+                    chromGroup,
+                    template,
+                    color_mapping,
+                    current_topologies,
+                    topoOrder,
+                    window_size,
+                    axis_line_width,
+                    xaxis_gridlines,
+                    yaxis_gridlines,
+                    wg_squish_expand,
+                    font_family,
+                )
+                whole_genome_graphs.append(
+                    html.Div([
+                        dcc.Graph(
+                            figure=fig,
+                            config=config_setting,
+                        )
+                    ])
+                )
+                continue
+        elif chrom_plot_type == 'tile':
+            # Iterate through chromosome groups + append graph
+            for chromGroup in chrom_groups:
+                chrom_order = [i for i in sorted_chromosomes if i in chromGroup]
+                fig = tree_utils.build_whole_genome_tile_plot(
+                    df,
+                    chromosome_df,
+                    chrom_order,
+                    template,
+                    color_mapping,
+                    current_topologies,
+                    topoOrder,
+                    window_size,
+                    axis_line_width,
+                    chromGroup,
+                    xaxis_gridlines,
+                    yaxis_gridlines,
+                    wg_squish_expand,
+                    font_family,
+                )
+                whole_genome_graphs.append(
+                    html.Div([
+                        dcc.Graph(
+                            figure=fig,
+                            config=config_setting,
+                        )
+                    ])
+                )
+                continue
+
+        # -- Generate alternative data graphs --
+        if not alt_data_switch:
+            pass
+        else:
+            alt_dropdown_options = [alt_dropdown_options] if type(alt_dropdown_options) == str else alt_dropdown_options
+            # Collect y-max from additional int/float data
+            y_maxes = tree_utils.get_y_max_list(alt_dropdown_options, df)
+            # Generate graphs
+            for y_max, alt_data_option in zip(y_maxes, alt_dropdown_options):
+                alt_graph = tree_utils.build_whole_genome_alt_data_graph(
+                    alt_data_option,
+                    chromosome_df,
+                    color_mapping,
+                    df,
+                    window_size,
+                    template,
+                    y_max,
+                    axis_line_width,
+                    xaxis_gridlines,
+                    yaxis_gridlines,
+                    font_family,
+                )
+                alt_data_graphs.append(
+                    html.Div(
+                        dcc.Graph(
+                            figure=alt_graph,
+                            config=dict(
+                                editable=True,
+                                displaylogo=False,
+                                doubleClick="reset",
+                                modeBarButtonsToRemove=[
+                                    "autoScale2d",
+                                    "lasso2d",
+                                    "select2d",
+                                ],
+                                toImageButtonOptions=dict(
+                                    format=snapshot_file_type,
+                                    filename=f"{alt_data_option}",
+                                ),
+                            ),
+                            className="stats-2-graph-style",
+                        ),
+                        style={'borderTop': '2px solid orange', 'paddingtop': '2px'},
                     )
-                ], width=12)
+                )
+        
+        return whole_genome_graphs, alt_data_graphs, dash.no_update
+    elif (init_graphs) and (not break_init):
+        # -- Set editable value --
+        editable_graphs = False if not editable_graphs else True
+        # -- Read in json data --
+        df = pd.read_json(tv_input_json)
+        chromosome_df = pd.read_json(chromosome_lengths)
+        sorted_chromosomes = tree_utils.sorted_nicely(chromosome_df['Chromosome'].unique())
+        # -- Set up graph config --
+        if (not pixel_height) or (not pixel_width):
+            # pixel_width, pixel_height = 1500, 1123
+            config_setting = dict(
+                doubleClick="reset",
+                displaylogo=False,
+                editable=editable_graphs,
+                modeBarButtonsToRemove=[
+                    "zoomin2D"
+                    "autoScale2d",
+                    # "resetScale2d",
+                    "pan2d",
+                    "lasso2d",
+                    "select2d",
+                ],
+                toImageButtonOptions=dict(
+                    format=snapshot_file_type,
+                    filename="Graph_Name",
+                ),
             )
-    elif chrom_plot_type == 'pie':
-        topoFreqTable = tree_utils.make_topo_freq_table(df_grouped)
-        # Iterate through chromosome groups + append graph
+        else:
+            config_setting = dict(
+                doubleClick="reset",
+                displaylogo=False,
+                editable=editable_graphs,
+                modeBarButtonsToRemove=[
+                    "zoomin2D"
+                    "autoScale2d",
+                    # "resetScale2d",
+                    "pan2d",
+                    "lasso2d",
+                    "select2d",
+                ],
+                toImageButtonOptions=dict(
+                    format=snapshot_file_type,
+                    filename="Graph_Name",
+                    width=int(pixel_width),
+                    height=int(pixel_height),
+                ),
+            )
+        # -- Set gridline bools --
+        xaxis_gridlines, yaxis_gridlines = tree_utils.get_gridline_bools(axis_gridlines)
+        df["GenomeFrequency"] = df["TopologyID"].map(df["TopologyID"].value_counts()/len(df))
+        df_grouped = df.groupby(by="Chromosome")
+        # -- Round up chromosome lengths for graph range --
+        chromosome_df["End"] = chromosome_df["End"].apply(lambda x: data_utils.roundUp(x, window_size))
+        # Remove topologies not currently chosen
+        topoOrder = [e for e in topoOrder if e in current_topologies]
+        # -- Set whole genome graph collection list --
+        whole_genome_graphs=[]
+        alt_data_graphs=[]
+        # -- Group Chromosomes into groups --
+        chrom_groups = tree_utils.mygrouper(num_chroms_per_graph, sorted_chromosomes)
         for chromGroup in chrom_groups:
-            fig = tree_utils.build_whole_genome_pie_charts(
-                topoFreqTable,
-                template,
-                color_mapping,
-                chromGroup,
-                font_family,
-            )
-            whole_genome_graphs.append(
-                dbc.Col([
-                    dcc.Graph(
-                        figure=fig,
-                        config=config,
-                        className="stats-2-graph-style",
-                    )
-                ], width=12)
-            )
-    elif chrom_plot_type == 'rug':
-        # Check if there are more than 100,000 rows, 
-        # if so return too many data point graph
-        if len(df) > 100000:
-            fig = tree_utils.no_tree_data(template, "Too many data points to plot")
-            whole_genome_graphs.append(
-                dbc.Col([
-                    dcc.Graph(
-                        figure=fig,
-                        config=config,
-                        className="stats-2-graph-style",
-                    )
-                ], width='auto')
-            )
-            return whole_genome_graphs
-        # Iterate through chromosome groups + append graph
-        for chromGroup in chrom_groups:
+            chrom_order = [i for i in sorted_chromosomes if i in chromGroup]
             fig = tree_utils.build_whole_genome_rug_plot(
                 df,
                 chromosome_df,
+                chrom_order,
                 chromGroup,
                 template,
                 color_mapping,
@@ -3734,103 +4224,70 @@ def whole_genome_plot(
                 html.Div([
                     dcc.Graph(
                         figure=fig,
-                        config=config,
+                        config=config_setting,
                     )
                 ])
             )
-    elif chrom_plot_type == 'tile':
-        # if so return too many data point graph
-        if len(df) > 100000:
-            fig = tree_utils.no_tree_data(template, "Too many data points to plot")
-            whole_genome_graphs.append(
-                dbc.Col([
-                    dcc.Graph(
-                        figure=fig,
-                        config=config,
-                        className="stats-2-graph-style",
-                    )
-                ], width=12)
-            )
-            return whole_genome_graphs
-        # Iterate through chromosome groups + append graph
-        for chromGroup in chrom_groups:
-            fig = tree_utils.build_whole_genome_tile_plot(
-                df,
-                chromosome_df,
-                template,
-                color_mapping,
-                current_topologies,
-                topoOrder,
-                window_size,
-                axis_line_width,
-                chromGroup,
-                xaxis_gridlines,
-                yaxis_gridlines,
-                wg_squish_expand,
-                font_family,
-            )
-            whole_genome_graphs.append(
-                html.Div([
-                    dcc.Graph(
-                        figure=fig,
-                        config=config,
-                    )
-                ])
-            )
-    
-    # --- Generate alternative data graphs ---
-    if not alt_data_switch:
-        pass
-    else:
-        alt_dropdown_options = [alt_dropdown_options] if type(alt_dropdown_options) == str else alt_dropdown_options
-        # Collect y-max from additional int/float data
-        y_maxes = tree_utils.get_y_max_list(alt_dropdown_options, df)
-        # Generate graphs
-        for y_max, alt_data_option in zip(y_maxes, alt_dropdown_options):
-            alt_graph = tree_utils.build_whole_genome_alt_data_graph(
-                alt_data_option,
-                chromosome_df,
-                color_mapping,
-                df,
-                window_size,
-                template,
-                y_max,
-                axis_line_width,
-                xaxis_gridlines,
-                yaxis_gridlines,
-                font_family,
-            )
-            alt_data_graphs.append(
-                html.Div(
-                    dcc.Graph(
-                        figure=alt_graph,
-                        config=dict(
-                            editable=True,
-                            displaylogo=False,
-                            doubleClick="reset",
-                            modeBarButtonsToRemove=[
-                                "autoScale2d",
-                                "lasso2d",
-                                "select2d",
-                            ],
-                            toImageButtonOptions=dict(
-                                format=snapshot_file_type,
-                                filename=f"{alt_data_option}",
-                            ),
-                        ),
-                        className="stats-2-graph-style",
-                    ),
-                    style={'borderTop': '2px solid orange', 'paddingtop': '2px'},
+            continue
+        # -- Generate alternative data graphs --
+        if not alt_data_switch:
+            pass
+        else:
+            alt_dropdown_options = [alt_dropdown_options] if type(alt_dropdown_options) == str else alt_dropdown_options
+            # Collect y-max from additional int/float data
+            y_maxes = tree_utils.get_y_max_list(alt_dropdown_options, df)
+            # Generate graphs
+            for y_max, alt_data_option in zip(y_maxes, alt_dropdown_options):
+                alt_graph = tree_utils.build_whole_genome_alt_data_graph(
+                    alt_data_option,
+                    chromosome_df,
+                    color_mapping,
+                    df,
+                    window_size,
+                    template,
+                    y_max,
+                    axis_line_width,
+                    xaxis_gridlines,
+                    yaxis_gridlines,
+                    font_family,
                 )
-            )
-    return whole_genome_graphs, alt_data_graphs
+                alt_data_graphs.append(
+                    html.Div(
+                        dcc.Graph(
+                            figure=alt_graph,
+                            config=dict(
+                                editable=True,
+                                displaylogo=False,
+                                doubleClick="reset",
+                                modeBarButtonsToRemove=[
+                                    "autoScale2d",
+                                    "lasso2d",
+                                    "select2d",
+                                ],
+                                toImageButtonOptions=dict(
+                                    format=snapshot_file_type,
+                                    filename=f"{alt_data_option}",
+                                ),
+                            ),
+                            className="stats-2-graph-style",
+                        ),
+                        style={'borderTop': '2px solid orange', 'paddingtop': '2px'},
+                    )
+                )
+        
+        return whole_genome_graphs, alt_data_graphs, True
+    elif not view_toggle:
+        raise PreventUpdate
+    else:
+        raise PreventUpdate
 
 
 @app.callback(
     # Outputs
     Output("tree-graphs-div", "children"),
     # Inputs
-    [Input("input-data-upload", "children"),
+    [Input("update-options", "n_clicks"),
+     Input("input-data-upload", "children"),
      Input("chromFile-data-upload", "children"),
      Input("alt_data_options", "value"),
      Input("chromosome-options", "value"),
@@ -3850,6 +4307,7 @@ def whole_genome_plot(
     ],
 )
 def generate_tree_graphs(
+    update_btn,
     tv_input_json,
     chromosome_length_data,
     alt_dropdown_options,
@@ -3868,6 +4326,8 @@ def generate_tree_graphs(
     font_family,
     tree_shape,
 ):
+    ctx = dash.callback_context
+    button_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
     if not tree_switch:
         return None
     elif input_modal_open:
@@ -3879,12 +4339,12 @@ def generate_tree_graphs(
     elif not current_topologies:
         # If not topologies are selected, return No Data Loaded graph
         return None
+    elif button_id != "update-options":
+        raise PreventUpdate
     else:
-        whole_tv_input_df = pd.read_json(tv_input_json)
+        tv_df = pd.read_json(tv_input_json)
         chromosome_df = pd.read_json(chromosome_length_data)
         chromosome_df["End"] = chromosome_df["End"].apply(lambda x: data_utils.roundUp(x, window_size))
-        tv_df = whole_tv_input_df[whole_tv_input_df["Chromosome"] == chromosome]
-        chromosome_df = chromosome_df[chromosome_df["Chromosome"] == chromosome]
         topology_graphs = []
         # Put alt data option into list if only one selected.
         alt_dropdown_options = [alt_dropdown_options] if type(alt_dropdown_options) == str else alt_dropdown_options         
@@ -3907,7 +4367,7 @@ def generate_tree_graphs(
         # Create hoverData tree
         if tv_hoverData:
             skip = False
-            x_pos = tree_utils.get_Treexpos(tv_hoverData, whole_tv_input_df)
+            x_pos = tree_utils.get_Treexpos(tv_hoverData, tv_df)
             poi_info = chrom_info[chrom_info["Window"] == x_pos]
             try:
                 curr_tree = poi_info["NewickTree"].tolist()[0]
@@ -4041,6 +4501,7 @@ def generate_tree_graphs(
                                         figure=hoverfig,
                                         style=tree_style,
                                         config=dict(
+                                            doubleClick="autosize",
                                             editable=editable_graphs,
                                             toImageButtonOptions=dict(
                                                 format=snapshot_file_type,
@@ -4052,6 +4513,8 @@ def generate_tree_graphs(
                                             modeBarButtonsToRemove=[
                                                 "lasso2d",
                                                 "select2d",
+                                                "autoScale2d",
+                                                "resetScale2d",
                                             ],
                                             displaylogo=False,
                                         ),
@@ -4332,7 +4795,8 @@ def NormRF(
 
 @app.callback(
     Output("quantile-graphs-div", "children"),
-    [Input("input-data-upload", "children"),
+    [Input("update-options", "n_clicks"),
+     Input("input-data-upload", "children"),
      Input("chromFile-data-upload", "children"),
      Input("template-option", "value"),
      Input("topology-color-chart-store", "data"),
@@ -4348,11 +4812,11 @@ def NormRF(
      Input("n-quantiles", "value"),
      Input("quantile-toggle", "value"),
      Input("chromosome-options", "value"),
-     Input("quantile-run-button", "n_clicks"),
      Input("font-family-option", "value"),
     ],
 )
 def quantile_graph(
+    update_btn,
     tv_input_json,
     chromosome_lengths,
     template,
@@ -4369,20 +4833,15 @@ def quantile_graph(
     n_quantiles,
     quantile_toggle,
     chromosome,
-    submit_btn,
     font_family,
 ):
     # ID context
     ctx = dash.callback_context
-    if not ctx.triggered:
-        button_id = None
-    else:
-        button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+    button_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
+
     # Run
     run = True
     if button_id == "quantile-toggle": # By pass run button if toggle is turned on/off
-        run = True
-    if button_id == "quantile-run-button":
         run = True
     if not quantile_toggle:
         run = False
@@ -4393,6 +4852,8 @@ def quantile_graph(
     # Generate graph if run = True
     if button_id == "n-quantiles":
         return dash.no_update
+    elif button_id != "update-options":
+        raise PreventUpdate
     elif run:
         # Set default quantile number if not provided
         if not n_quantiles:
@@ -4637,8 +5098,6 @@ def topology_quantile(
     else:
         return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
-
-
 # ---------------------- DataTable Callbacks ---------------------
 @app.callback(
     [Output("basic-whole-genome-stats", "data"),
@@ -4685,6 +5144,7 @@ def whole_genome_data_table_stats(
      Input("tv-pixel-width", "value"),
      Input("window-size", "children"),
      Input("font-family-option", "value"),
+     Input("toggle-chrom-whole-genome", "value"),
     ],
      prevent_initial_call=True,
 )
@@ -4700,6 +5160,7 @@ def current_view_summary_stats(
     pixel_width,
     window_size,
     font_family,
+    view_toggle,
 ):
     if not tv_input_json:
         raise PreventUpdate
@@ -4707,19 +5168,30 @@ def current_view_summary_stats(
         raise PreventUpdate
     chromosome_df = pd.read_json(chromosome_length_json)
     whole_tv_input_df = pd.read_json(tv_input_json)
-    tv_df = whole_tv_input_df[whole_tv_input_df["Chromosome"] == chromosome]
+    # tv_df = whole_tv_input_df
     dataMin, dataMax = dataRange
     # Filter data to current view only
-    number_windows_in_chromosome = len(tv_df)
-    current_view_tv_input_df = tv_df[(tv_df["Window"] >= dataMin) & (tv_df["Window"] <= dataMax)]
+    if view_toggle:
+        tv_df = whole_tv_input_df[(whole_tv_input_df["Chromosome"] == chromosome)]
+        current_view_tv_input_df = tv_df[(tv_df["Window"] >= dataMin) & (tv_df["Window"] <= dataMax)]
+        # number_windows_in_chromosome = len(tv_df)
+    else:
+        current_view_tv_input_df = whole_tv_input_df
+        # number_windows_in_chromosome = len(current_view_tv_input_df)
     # Generate dataframes of data
     basic_stats_topo_freqs, basic_stats_datatable = tree_utils.basic_stats_dfs(current_view_tv_input_df)
     # Set up data table columns + data
+    if view_toggle:
+        current_view_title = f"Current View - {chromosome}:{int(dataMin)}-{int(dataMax)}"
+    else:
+        current_view_title = "Whole genome"
+        chromosome = "Whole genome"
+
     if basic_stats_datatable.empty:
         basic_alt_data_stats_columns = []
         basic_alt_data_stats_data = []
     else:
-        basic_alt_data_stats_columns = [{"name": [f"Current View = {chromosome}:{int(dataMin)}-{int(dataMax)}", i], "id": i, 'type': 'numeric', 'format': Format(precision=4, scheme=Scheme.decimal)} for i in basic_stats_datatable.columns]
+        basic_alt_data_stats_columns = [{"name": [current_view_title, i], "id": i, 'type': 'numeric', 'format': Format(precision=4, scheme=Scheme.decimal)} for i in basic_stats_datatable.columns]
         basic_alt_data_stats_data = basic_stats_datatable.to_dict('records')
     
     # Generate general stats data
@@ -4732,9 +5204,9 @@ def current_view_summary_stats(
                 "Genome length",
                 # "Average chromosome length",
                 "Total topologies",
-                "Percent missing data",
+                "Percent missing data (*based on total NODATA entries*)",
                 "Windows in genome",
-                f"Windows in chromosome {chromosome}",
+                # f"Windows in chromosome {chromosome}",
                 f"Windows in current view",
             ],
             "Value": [
@@ -4743,7 +5215,7 @@ def current_view_summary_stats(
                 len(whole_tv_input_df["TopologyID"].unique()),
                 f"{perc_missing_data}%",
                 len(whole_tv_input_df),
-                number_windows_in_chromosome,
+                # number_windows_in_chromosome,
                 len(current_view_tv_input_df)],
         }
     )
@@ -4763,7 +5235,7 @@ def current_view_summary_stats(
             height=int(pixel_height),
         ),
     )
-    pie_fig = tree_utils.current_view_topo_freq_chart(basic_stats_topo_freqs, template, color_mapping)
+    pie_fig = tree_utils.current_view_topo_freq_chart(basic_stats_topo_freqs, template, color_mapping, current_view_title)
     # Create pie chart
     topo_freq_df = pd.DataFrame(whole_tv_input_df["TopologyID"].value_counts()/len(whole_tv_input_df))
     topo_freq_df = topo_freq_df.reset_index()
@@ -5149,11 +5621,8 @@ def download_chrom_length_template_file(
     
     if button_id == "chrom-length-download-button":
         content = tree_utils.chrom_len_template()
-        return dcc.send_data_frame(content.to_csv, filename='ChromosomeLengths.bed', sep="\t", index=False, header=False)
+        return dcc.send_data_frame(content.to_csv, filename='ChromosomeLengths.bed', sep="\t", index=False)
     else:
         raise PreventUpdate
-
-
-
 
 

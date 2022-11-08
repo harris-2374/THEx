@@ -93,7 +93,7 @@ def figure_output_scales():
 
 
 def graph_templates():
-    return ['plotly', 'plotly_white', 'plotly_dark', 'ggplot2', 'presentation', 'seaborn', 'simple_white']
+    return ['plotly_dark', 'simple_white', 'plotly_white', 'plotly', 'ggplot2', 'presentation', 'seaborn']
 
 
 def snapshot_file_type():
