@@ -451,6 +451,7 @@ graph_switch_col1 = dbc.Form(
             dbc.Col([
                 dcc.Input(
                     id='whole-genome-per-graph-chrom-count',
+                    value=19,
                     type="number",
                     style={'width': '50px'},
                 ),
@@ -1950,20 +1951,19 @@ def upload_gff_file(
         if not gffContents:
             return True, None, gffFilename, "primary", False
         _, content_string = gffContents.split(",")
-        tvDecoded = base64.b64decode(content_string)
+        gffDecoded = base64.b64decode(content_string)
         if ("gff" in gffFilename) or ("gtf" in gffFilename):
             try:
-                assert tree_utils.valid_gff_gtf(io.StringIO(tvDecoded.decode("utf-8")))
+                assert tree_utils.valid_gff_gtf(io.StringIO(gffDecoded.decode("utf-8")))
             except AssertionError:
                 return False, None, gffFilename, "danger", True
             gffDF = pd.read_csv(
-                io.StringIO(tvDecoded.decode("utf-8")),
+                io.StringIO(gffDecoded.decode("utf-8")),
                 sep="\t",
                 names=["chromosome", "source", "feature", "start",
                        "end", "score", "strand", "frame", "attribute"],
                 comment="#",
             )
-            gffDF["attribute"] = gffDF["attribute"].apply(lambda x: data_utils.get_gene_name(x))
             return False, [gffDF.to_json()], gffFilename, "success", False
         else:
             return True, None, gffFilename, "Please provide a valid GFF/GTF file", False
@@ -1990,7 +1990,6 @@ def upload_gff_file(
                         "end", "score", "strand", "frame", "attribute"],
                     comment="#",
                 )
-                gffDF["attribute"] = gffDF["attribute"].apply(lambda x: data_utils.get_gene_name(x))
                 for i in gffDF["start"]:
                     try:
                         int(i)
@@ -3231,19 +3230,19 @@ def set_alt_data_options(
 
 
 # Set init chroms per whole-genome graphs
-@app.callback(
-    Output("whole-genome-per-graph-chrom-count", "value"),
-    [Input("whole-genome-per-graph-chrom-count", "value"),
-     Input("input-data-upload", "children"),
-    ],
-)
-def set_whole_genome_chrom_count(chrom_count, tv_input_json):
-    if not tv_input_json:
-        raise PreventUpdate
-    elif not chrom_count:
-        df = pd.read_json(tv_input_json)
-        chrom_count = tree_utils.get_recommended_chrom_num(len(df)) 
-    return chrom_count
+# @app.callback(
+#     Output("whole-genome-per-graph-chrom-count", "value"),
+#     [Input("whole-genome-per-graph-chrom-count", "value"),
+#      Input("input-data-upload", "children"),
+#     ],
+# )
+# def set_whole_genome_chrom_count(chrom_count, tv_input_json):
+#     if not tv_input_json:
+#         raise PreventUpdate
+#     elif not chrom_count:
+#         df = pd.read_json(tv_input_json)
+#         chrom_count = tree_utils.get_recommended_chrom_num(len(df)) 
+#     return chrom_count
 
 
 # ---------------------- Relayout Data Handlers ----------------------
@@ -3304,10 +3303,7 @@ def update_relayout(
     range_set,
 ):
     ctx = dash.callback_context
-    if not ctx.triggered:
-        button_id = None
-    else:
-        button_id = ctx.triggered[0]["prop_id"].split(".")[0]
+    button_id = ctx.triggered[0]["prop_id"].split(".")[0] if ctx.triggered else None
     if not chromosome_length_data:
         raise PreventUpdate
     relayout_keys = [k for k in relayout_data.keys()]
@@ -3566,7 +3562,6 @@ def home_tab_graphs(
                             gff_df = pd.read_json(gff_json)
                         except ValueError:
                             raise PreventUpdate
-                        # gff_df = gff_df[(gff_df["start"] >= dataMin) & (gff_df["end"] <= dataMax) & (gff_df["chromosome"] == chromosome)]
                         gff_df = gff_df[(gff_df["chromosome"] == chromosome)]
                         if abs(dataMin - dataMax) > 50000000:
                             topology_graphs.append(
@@ -3577,6 +3572,7 @@ def home_tab_graphs(
                                             figure=tree_utils.zoom_in_gff(template),
                                             className="gff-style",
                                             config=dict(
+                                                displaylogo=False,
                                                 displayModeBar=False,
                                             ),
                                         ),
@@ -3592,6 +3588,7 @@ def home_tab_graphs(
                                             figure=tree_utils.no_tree_data(template, "No data in region"),
                                             className="gff-style",
                                             config=dict(
+                                                displaylogo=False,
                                                 displayModeBar=False,
                                             ),
                                         ),
@@ -3601,12 +3598,13 @@ def home_tab_graphs(
                         else:
                             gff_figure = tree_utils.build_gff_figure(
                                 gff_df,
-                                dataRange,
-                                template,
-                                axis_line_width,
-                                xaxis_gridlines,
-                                yaxis_gridlines,
-                                font_family,
+                                dataMin,
+                                dataMax,
+                                template=template,
+                                axis_line_width=axis_line_width,
+                                xaxis_gridlines=xaxis_gridlines,
+                                yaxis_gridlines=yaxis_gridlines,
+                                font_family=font_family,
                             )
                             topology_graphs.append(
                                 html.Div(
@@ -3661,7 +3659,7 @@ def home_tab_graphs(
             ),
         )
         return topo_dist_graph, topology_graphs, tv_main_dist_config
-    elif (view_toggle) and (button_id == "toggle-chrom-whole-genome"):
+    elif (view_toggle) and (button_id == "toggle-chrom-whole-genome") and (button_id == 'update-options'):
         # -- Run callback --
         topoOrder = [e for e in topoOrder if e in current_topologies]
         whole_tv_input_df = pd.read_json(tv_input_json)
@@ -3791,12 +3789,13 @@ def home_tab_graphs(
                         else:
                             gff_figure = tree_utils.build_gff_figure(
                                 gff_df,
-                                dataRange,
-                                template,
-                                axis_line_width,
-                                xaxis_gridlines,
-                                yaxis_gridlines,
-                                font_family,
+                                dataMin,
+                                dataMax,
+                                template=template,
+                                axis_line_width=axis_line_width,
+                                xaxis_gridlines=xaxis_gridlines,
+                                yaxis_gridlines=yaxis_gridlines,
+                                font_family=font_family,
                             )
                             topology_graphs.append(
                                 html.Div(
@@ -4040,60 +4039,68 @@ def whole_genome_plot(
             # Iterate through chromosome groups + append graph
             for chromGroup in chrom_groups:
                 chrom_order = [i for i in sorted_chromosomes if i in chromGroup]
-                fig = tree_utils.build_whole_genome_rug_plot(
-                    df,
-                    chromosome_df,
-                    chrom_order,
-                    chromGroup,
-                    template,
-                    color_mapping,
-                    current_topologies,
-                    topoOrder,
-                    window_size,
-                    axis_line_width,
-                    xaxis_gridlines,
-                    yaxis_gridlines,
-                    wg_squish_expand,
-                    font_family,
-                )
-                whole_genome_graphs.append(
-                    html.Div([
-                        dcc.Graph(
-                            figure=fig,
-                            config=config_setting,
-                        )
-                    ])
-                )
-                continue
+                filt_df = df[(df['TopologyID'].isin(current_topologies)) & (df['Chromosome'].isin(chromGroup))]
+                if filt_df.empty:
+                    continue
+                else:
+                    fig = tree_utils.build_whole_genome_rug_plot(
+                        filt_df,
+                        chromosome_df,
+                        chrom_order,
+                        chromGroup,
+                        template,
+                        color_mapping,
+                        current_topologies,
+                        topoOrder,
+                        window_size,
+                        axis_line_width,
+                        xaxis_gridlines,
+                        yaxis_gridlines,
+                        wg_squish_expand,
+                        font_family,
+                    )
+                    whole_genome_graphs.append(
+                        html.Div([
+                            dcc.Graph(
+                                figure=fig,
+                                config=config_setting,
+                            )
+                        ])
+                    )
+                    continue
         elif chrom_plot_type == 'tile':
             # Iterate through chromosome groups + append graph
             for chromGroup in chrom_groups:
                 chrom_order = [i for i in sorted_chromosomes if i in chromGroup]
-                fig = tree_utils.build_whole_genome_tile_plot(
-                    df,
-                    chromosome_df,
-                    chrom_order,
-                    template,
-                    color_mapping,
-                    current_topologies,
-                    topoOrder,
-                    window_size,
-                    axis_line_width,
-                    chromGroup,
-                    xaxis_gridlines,
-                    yaxis_gridlines,
-                    wg_squish_expand,
-                    font_family,
-                )
-                whole_genome_graphs.append(
-                    html.Div([
-                        dcc.Graph(
-                            figure=fig,
-                            config=config_setting,
-                        )
-                    ])
-                )
-                continue
+                filt_df = df[(df['TopologyID'].isin(current_topologies)) & (df['Chromosome'].isin(chromGroup))]
+                if filt_df.empty:
+                    continue
+                else:
+                    fig = tree_utils.build_whole_genome_tile_plot(
+                        filt_df,
+                        chromosome_df,
+                        chrom_order,
+                        template,
+                        color_mapping,
+                        current_topologies,
+                        topoOrder,
+                        window_size,
+                        axis_line_width,
+                        chromGroup,
+                        xaxis_gridlines,
+                        yaxis_gridlines,
+                        wg_squish_expand,
+                        font_family,
+                    )
+                    whole_genome_graphs.append(
+                        html.Div([
+                            dcc.Graph(
+                                figure=fig,
+                                config=config_setting,
+                            )
+                        ])
+                    )
+                    continue
 
         # -- Generate alternative data graphs --
         if not alt_data_switch:
@@ -4204,31 +4211,35 @@ def whole_genome_plot(
         chrom_groups = tree_utils.mygrouper(num_chroms_per_graph, sorted_chromosomes)
         for chromGroup in chrom_groups:
             chrom_order = [i for i in sorted_chromosomes if i in chromGroup]
-            fig = tree_utils.build_whole_genome_rug_plot(
-                df,
-                chromosome_df,
-                chrom_order,
-                chromGroup,
-                template,
-                color_mapping,
-                current_topologies,
-                topoOrder,
-                window_size,
-                axis_line_width,
-                xaxis_gridlines,
-                yaxis_gridlines,
-                wg_squish_expand,
-                font_family,
-            )
-            whole_genome_graphs.append(
-                html.Div([
-                    dcc.Graph(
-                        figure=fig,
-                        config=config_setting,
-                    )
-                ])
-            )
-            continue
+            filt_df = df[(df['TopologyID'].isin(current_topologies)) & (df['Chromosome'].isin(chromGroup))]
+            if filt_df.empty:
+                continue
+            else:
+                fig = tree_utils.build_whole_genome_rug_plot(
+                    filt_df,
+                    chromosome_df,
+                    chrom_order,
+                    chromGroup,
+                    template,
+                    color_mapping,
+                    current_topologies,
+                    topoOrder,
+                    window_size,
+                    axis_line_width,
+                    xaxis_gridlines,
+                    yaxis_gridlines,
+                    wg_squish_expand,
+                    font_family,
+                )
+                whole_genome_graphs.append(
+                    html.Div([
+                        dcc.Graph(
+                            figure=fig,
+                            config=config_setting,
+                        )
+                    ])
+                )
+                continue
         # -- Generate alternative data graphs --
         if not alt_data_switch:
             pass
@@ -4339,7 +4350,7 @@ def generate_tree_graphs(
     elif not current_topologies:
         # If not topologies are selected, return No Data Loaded graph
         return None
-    elif button_id != "update-options":
+    elif (button_id != "update-options") and (not tv_hoverData):
         raise PreventUpdate
     else:
         tv_df = pd.read_json(tv_input_json)
@@ -4365,7 +4376,9 @@ def generate_tree_graphs(
             tree_title_className = "tree-title-light"
 
         # Create hoverData tree
-        if tv_hoverData:
+        if not view_toggle:
+            pass
+        elif tv_hoverData:
             skip = False
             x_pos = tree_utils.get_Treexpos(tv_hoverData, tv_df)
             poi_info = chrom_info[chrom_info["Window"] == x_pos]
@@ -4390,6 +4403,7 @@ def generate_tree_graphs(
                                         figure=tree_utils.no_tree_data(template, "Topology not present on CHR"),
                                         style={"width": "100%", "height": "40vh", "background-color": "black"},
                                         config=dict(
+                                            displaylogo=False,
                                             toImageButtonOptions=dict(
                                                 format=snapshot_file_type,
                                                 filename="Graph_Name",
@@ -4418,6 +4432,7 @@ def generate_tree_graphs(
                                         figure=tree_utils.no_tree_data(template, "No Data"),
                                         style={"width": "100%", "height": "40vh", "background-color": "black"},
                                         config=dict(
+                                            displaylogo=False,
                                             toImageButtonOptions=dict(
                                                 format=snapshot_file_type,
                                                 filename="Graph_Name",
@@ -4446,6 +4461,7 @@ def generate_tree_graphs(
                                         figure=tree_utils.no_tree_data(template, "No Taxa Selected"),
                                         style={"width": "100%", "height": "40vh", "background-color": "black"},
                                         config=dict(
+                                            displaylogo=False,
                                             toImageButtonOptions=dict(
                                                 format=snapshot_file_type,
                                                 filename="Graph_Name",
@@ -4527,7 +4543,7 @@ def generate_tree_graphs(
                 )
         else:
             pass
-
+        
         for topo in current_topologies:
             # Filter data
             curr_topo_df = tv_df[tv_df["TopologyID"] == topo]
@@ -4548,6 +4564,7 @@ def generate_tree_graphs(
                                         figure=tree_utils.no_tree_data(template, "Topology not present on CHR"),
                                         style={"width": "100%", "height": "40vh", "background-color": "black"},
                                         config=dict(
+                                            displaylogo=False,
                                             toImageButtonOptions=dict(
                                                 format=snapshot_file_type,
                                                 filename="Graph_Name",
@@ -4575,6 +4592,7 @@ def generate_tree_graphs(
                                         figure=tree_utils.no_tree_data(template, "No Data"),
                                         style={"width": "100%", "height": "40vh", "background-color": "black"},
                                         config=dict(
+                                            displaylogo=False,
                                             toImageButtonOptions=dict(
                                                 format=snapshot_file_type,
                                                 filename="Graph_Name",
@@ -4602,6 +4620,7 @@ def generate_tree_graphs(
                                         figure=tree_utils.no_tree_data(template, "No Taxa Selected"),
                                         style={"width": "100%", "height": "40vh", "background-color": "black"},
                                         config=dict(
+                                            displaylogo=False,
                                             toImageButtonOptions=dict(
                                                 format=snapshot_file_type,
                                                 filename="Graph_Name",
@@ -4678,6 +4697,7 @@ def generate_tree_graphs(
                 ),
             )
             continue
+        
         topology_graphs.append(
             dbc.Row(
                 children=tree_divs,

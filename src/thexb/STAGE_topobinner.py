@@ -50,39 +50,29 @@ def tv_header_validation(df):
 def topobinner(TREEVIEWER_FN, UPDATED_TV_FILENAME, TOPOBIN_ROOTED, WORKING_DIR, LOG_LEVEL):
     logger = set_logger_level(WORKING_DIR, LOG_LEVEL)  # Setup log file level
     # Load in Tree Viewer excel file
-    df = pd.read_excel(TREEVIEWER_FN, engine='openpyxl')
+    df = pd.read_excel(TREEVIEWER_FN)
     df = df.reset_index(drop=True)
     # Validate headers
     header_check = tv_header_validation(df)
     if not header_check:
         raise AssertionError("Input file headers are not valid, please ensure required headers are correct.")
-    df['TopologyID'] = ['NULL']*len(df)
     trees = df['NewickTree']
     topologies = dict()
     logger.info(f"{len(trees):,} trees to run")
     # Set root boolean value
-    if TOPOBIN_ROOTED == "Y":
-        TOPOBIN_ROOTED = False
-    else:
-        TOPOBIN_ROOTED = True
+    TOPOBIN_ROOTED == False if TOPOBIN_ROOTED == 'Y' else True
     # Bin Trees
-    tqdm_text = "#" + "{}".format("run1").zfill(3)
+    tqdm_text = "{}".format("topobinner").zfill(3)
     with tqdm(total=len(trees), desc=tqdm_text) as pbar:
         for n, t in enumerate(trees):
-            # Check to see if tree is NoTree
             if t == "NoTree":
                 pbar.update(1)
                 continue
-            # Set first tree in collection dictionary +
-            # move to next tree 
-            if len(topologies.keys()) == 0:
+            elif len(topologies.keys()) == 0:
                 topologies[n] = {'count': 1, 'idx': [n]}
                 pbar.update(1)
                 continue
             else:
-                # Iterate through topology list
-                # add new topology if no rf == 0
-                # increase count if rf == 0 with topology 
                 new_topology = True
                 for idx in topologies.keys():
                     if df.at[idx, 'NewickTree'] == "NoTree":
@@ -107,33 +97,29 @@ def topobinner(TREEVIEWER_FN, UPDATED_TV_FILENAME, TOPOBIN_ROOTED, WORKING_DIR, 
                     continue
     # Sort topologies dictionary by 'count'
     topologies = {k: v for k, v in sorted(topologies.items(), key=lambda item: item[1]['count'], reverse=True)}
-    num_topologies = len(topologies.keys())
     # Set zfill number
-    if num_topologies < 100:
+    if len(topologies.keys()) < 100:
         zfillnum = 3
-    elif 100 < num_topologies < 1000:
+    elif 100 < len(topologies.keys()) < 1000:
         zfillnum = 4
     else:
         zfillnum = 5
     # Update DataFrame TopologyID column with results
-    overview_df = pd.DataFrame(
-        {
-            "TopologyID": [("Tree" + "{}".format(str(i)).zfill(zfillnum)) for i in range(1, len(topologies.keys())+1)],
-            "Count": [topologies[i]["count"] for i in topologies.keys()],
-            "Rank": [i for i in range(1, len(topologies.keys())+1)],
-        }
-    )
+    overview_df = pd.DataFrame({
+        "TopologyID": [("Tree" + "{}".format(str(i)).zfill(zfillnum)) for i in range(1, len(topologies.keys())+1)],
+        "Count": [topologies[i]["count"] for i in topologies.keys()],
+        "Rank": [i for i in range(1, len(topologies.keys())+1)],
+    })
     topoCount = 1
     for topo in topologies.keys():
         idx = topologies[topo]['idx']
-        topoName = "Tree" + "{}".format(topoCount).zfill(zfillnum)
         for i in idx:
-            df.at[i, 'TopologyID'] = topoName
+            df.at[i, 'TopologyID'] = "Tree" + "{}".format(topoCount).zfill(zfillnum)
             continue
         topoCount += 1
     # Output updated Tree Viewer file
-    df.to_excel(UPDATED_TV_FILENAME, index=False, engine='openpyxl')
-    logger.info(f"{overview_df}")
+    df.to_excel(UPDATED_TV_FILENAME, index=False)
+    logger.info(f"\n{overview_df}")
     return
 
 

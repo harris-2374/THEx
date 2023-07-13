@@ -1132,9 +1132,10 @@ def build_rug_plot(
             legendgroup=topology,
             mode='markers',
             marker_symbol='line-ns-open',
-            marker_size=int(100/len(grouped_topology_df)),
+            # marker_size=int(100/len(grouped_topology_df)),
             marker_line_width=1,
             marker_color=[color_mapping[topology]]*len(data),
+            showlegend=True,
         ))
     # Update figure layout + axes
     fig.update_layout(
@@ -1321,183 +1322,164 @@ def build_alt_data_graph(
 
 
 def build_gff_figure(
-    data,
-    dataRange,
-    template,
-    axis_line_width,
-    xaxis_gridlines,
-    yaxis_gridlines,
-    font_family,
+    gff_df,
+    min_range,
+    max_range,
+    template="plotly_dark",
+    axis_line_width=1,
+    xaxis_gridlines=False,
+    yaxis_gridlines=False,
+    font_family="Arial",
 ):
-    regionStart, regionEnd = dataRange
-    # Show gene names if showing less than 1Mb of data
-    # if abs(regionEnd - regionStart) <= 10000000:
-    if abs(regionEnd - regionStart) <= 10000000:
-        show_gene_names = True
-    else:
-        show_gene_names = False
-    # Separate 
-    # group data by feature and gene name
-    attr_group = data.groupby(by=['source', 'feature', 'attribute', 'strand'])
-    positive_text_pos = "top center"
-    negative_text_pos = "top center"
-    features_graphed = list()
-    fig = go.Figure()
-    y_idx = 1
-    curr_feature = dict()
-    for fg, gene_data in attr_group:        
-        src, feature, gene, strand = fg
-        feature_strand = f"{feature} ({strand})"
-        x_values = sorted(gene_data['start'].to_list() + gene_data['end'].to_list())
-        if len(x_values) == 2:
-            # Update y-axis value if new feature
-            if not curr_feature:
-                curr_feature[feature_strand] = y_idx
-                y_idx += 1
-            elif feature_strand in curr_feature.keys():
-                pass
-            else:
-                curr_feature[feature_strand] = y_idx
-                y_idx += 1
-            # Set legend show if feature in list already
-            if feature_strand in features_graphed:
-                show_legend = False
-            else:
-                show_legend = True
-                features_graphed.append(feature_strand)
-            # Set color, y-values, and arrow direction
-            if strand == '+':
-                colorValue = 'red'
-                y_values = [curr_feature[feature_strand]]*len(x_values)
-                markerSymbol = ['square']*(len(x_values)-1) + ['triangle-right']
-                text_pos = positive_text_pos
-                text_val = [gene] + ['']*(len(x_values)-1)
-                # text_val = [gene]*(len(x_values))
-                if positive_text_pos == "top center":
-                    positive_text_pos = "bottom center"
-                elif positive_text_pos == "bottom center":
-                    positive_text_pos = "top center"
-            else:
-                colorValue = '#009BFF'
-                y_values = [curr_feature[feature_strand]]*len(x_values)
-                markerSymbol = ['triangle-left'] + ['square']*(len(x_values)-1)
-                text_pos = negative_text_pos
-                text_val = ['']*(len(x_values)-1) + [gene]
-                # text_val = [gene]*(len(x_values))
-                if negative_text_pos == "top center":
-                    negative_text_pos = "bottom center"
-                elif negative_text_pos == "bottom center":
-                    negative_text_pos = "top center"
-            if show_gene_names:
-                fig.add_trace(go.Scatter(
-                    x=x_values,
-                    y=y_values,
-                    name=feature_strand,
-                    legendgroup=feature_strand,
-                    mode='markers+lines+text',
-                    marker_symbol=markerSymbol,
-                    marker_size=8,
-                    marker_color=colorValue,
-                    text=text_val,
-                    textposition=text_pos,
-                    textfont=dict(
-                        size=10,
-                    ),
-                    hovertemplate=None,
-                    showlegend=show_legend,
-                ))
-            else:
-                fig.add_trace(go.Scatter(
-                    x=x_values,
-                    y=y_values,
-                    name=feature_strand,
-                    legendgroup=feature_strand,
-                    mode='markers+lines',
-                    marker_symbol=markerSymbol,
-                    marker_size=8,
-                    marker_color=colorValue,
-                    # hoverinfo=['all'],
-                    hovertemplate=None,
-                    showlegend=show_legend,
-                ))
-        elif len(x_values) > 2:
-            positions = [x_values[n:n+2] for n in range(0, len(x_values), 2)]
-            for curr_x_values in positions:
-                # Update y-axis value if new feature
-                if not curr_feature:
-                    curr_feature[feature_strand] = y_idx
-                    y_idx += 1
-                elif feature_strand in curr_feature.keys():
-                    pass
+    """
+    Supported features: gene, mRNA, CDS, exon
+    """
+    def gff_groups(gff_df):
+        group_list=[]
+        prev=None
+        idx=0
+        if len(gff_df.feature.unique()) == 1:
+            [group_list.append(i) for i in range(len(gff_df))]
+        else:
+            for i in gff_df.itertuples():
+                if not prev:
+                    prev = i.feature
+                    group_list.append(idx)
+                elif prev != i.feature:
+                    idx += 1
+                    prev = i.feature
+                    group_list.append(idx)
                 else:
-                    curr_feature[feature_strand] = y_idx
-                    y_idx += 1
-                # Set legend show if feature in list already
-                if feature_strand in features_graphed:
-                    show_legend = False
-                else:
-                    show_legend = True
-                    features_graphed.append(feature_strand)
-                # Set color, y-values, and arrow direction
-                if strand == '+':
-                    colorValue = 'red'
-                    y_values = [curr_feature[feature_strand]]*len(curr_x_values)
-                    markerSymbol = ['square']*(len(curr_x_values)-1) + ['triangle-right']
-                    text_pos = positive_text_pos
-                    text_val = [gene] + ['']*(len(x_values)-1)
-                    # text_val = [gene]*(len(curr_x_values))
-                    if positive_text_pos == "top center":
-                        positive_text_pos = "bottom center"
-                    elif positive_text_pos == "bottom center":
-                        positive_text_pos = "top center"
-                else:
-                    colorValue = '#009BFF'
-                    y_values = [curr_feature[feature_strand]]*len(curr_x_values)
-                    markerSymbol = ['triangle-left'] + ['square']*(len(curr_x_values)-1)
-                    text_pos = negative_text_pos
-                    text_val = ['']*(len(curr_x_values)-1) + [gene]
-                    # text_val = [gene]*(len(curr_x_values))
-                    if negative_text_pos == "top center":
-                        negative_text_pos = "bottom center"
-                    elif negative_text_pos == "bottom center":
-                        negative_text_pos = "top center"
-                if show_gene_names:
-                    fig.add_trace(go.Scatter(
-                        x=curr_x_values,
-                        y=y_values,
-                        name=feature_strand,
-                        legendgroup=feature_strand,
-                        mode='markers+lines+text',
-                        marker_symbol=markerSymbol,
-                        marker_size=8,
-                        marker_color=colorValue,
-                        text=text_val,
-                        textposition=text_pos,
-                        textfont=dict(
-                            size=10,
-                        ),
-                        hovertemplate=None,
-                        showlegend=show_legend,
-                    ))
-                else:
-                    fig.add_trace(go.Scatter(
-                        x=curr_x_values,
-                        y=y_values,
-                        name=feature_strand,
-                        legendgroup=feature_strand,
-                        mode='markers+lines',
-                        marker_symbol=markerSymbol,
-                        marker_size=8,
-                        marker_color=colorValue,
-                        # hoverinfo=['all'],
-                        hovertemplate=None,
-                        showlegend=show_legend,
-                    ))
-            continue
-        
+                    group_list.append(idx)
+        return group_list
 
+
+    def category_order_sorting(feature_list):
+        built_in = ['gene', 'mRNA', 'exon', 'CDS']
+        for i in built_in:
+            try:
+                old_index = feature_list.index(i)
+                feature_list.insert(built_in.index(i), feature_list.pop(old_index))
+            except ValueError:
+                continue
+        reversed(feature_list)
+        return feature_list
+
+
+    def create_marker_symbol_list(x_values, feature, strand):
+        if strand == '+':
+            if feature == 'gene':
+                marker_symbol = ['square']*(len(x_values)-1) + ['triangle-right']
+            elif (feature == 'exon') or (feature == 'CDS'):
+                marker_symbol = []
+                markers = {0: "triangle-right", 1: "triangle-left"}
+                for n, _ in enumerate(x_values, 1):
+                    marker_symbol.append(markers[0]) if n % 2 != 0 else marker_symbol.append(markers[1])
+            else:
+                marker_symbol = ['square']*(len(x_values)-1) + ['triangle-right']
+            pass
+        else:
+            if feature == 'gene':
+                marker_symbol = ['triangle-left'] + ['square']*(len(x_values)-1)
+            elif (feature == 'exon') or (feature == 'CDS'):
+                marker_symbol = []
+                markers = {0: "triangle-right", 1: "triangle-left"}
+                for n, _ in enumerate(x_values, 1):
+                    marker_symbol.append(markers[0]) if n % 2 != 0 else marker_symbol.append(markers[1])
+            else:
+                marker_symbol = ['triangle-left'] + ['square']*(len(x_values)-1)
+            pass
+        return marker_symbol
+
+
+    def get_attributes(data):
+        attribute_list=[]
+        genes=[]
+        for attr in data.attribute:
+            for i in attr.split(";"):
+                # Split depending on GFF or GTF
+                if '"' in i:
+                    info = i.replace(" ", "").split('"')
+                else:
+                    info = i.replace(" ", "").split('=')
+                
+                if len(info) < 2:
+                    continue
+                else:
+                    attribute_list.append(f"{info[0]} = {info[1]}<br>")
+                    if (info[0] == 'gene') or (info[0] == 'ID'):
+                        genes.append(info[1])
+                    continue
+        return attribute_list, genes
+    
+
+    def chunker(seq, size):
+        return (seq[pos:pos + size] for pos in range(0, len(seq), size))
+
+    features_graphed = list()
+    features_order=list()
+    fig = go.Figure()
+    gff_df.insert(0, 'groups', gff_groups(gff_df))
+    for _, data in gff_df.groupby(by=['groups']):
+        feature = data.feature.unique()[0]
+        strand = data.strand.unique()[0]
+        attribute_list, genes = get_attributes(data)
+        x_values = sorted(data['start'].to_list() + data['end'].to_list())
+        # Set legend show if feature in list already
+        features_graphed.append(feature) if feature not in features_graphed else None
+        features_order.append(feature) if feature not in features_graphed else None
+        y_values = [feature]*len(x_values)
+        marker_symbol = create_marker_symbol_list(x_values, feature, strand)
+        color_value = 'red' if strand == '+' else '#009BFF'
+        fig.add_trace(go.Scatter(
+            x=x_values if feature.lower() not in ['exon', 'cds'] else [min(x_values), max(x_values)],
+            y=y_values if feature.lower() not in ['exon', 'cds'] else [feature, feature],
+            name=feature,
+            legendgroup=feature,
+            mode='markers+lines' if feature.lower() not in ['exon', 'cds'] else 'lines',
+            marker_symbol=marker_symbol,
+            marker_size=8,
+            marker_color=color_value,
+            text="".join(attribute_list) if feature.lower() not in ['exon', 'cds'] else None,
+            hovertemplate= None if feature.lower() in ['exon', 'cds'] else "",
+            # text="".join(attribute_list),
+            textfont=dict(size=10),
+            showlegend=False,
+        ))
+        if feature.lower() in ['exon', 'cds']:
+            for group, attr in zip(chunker(x_values, 2), chunker(attribute_list, 2)):
+                fig.add_trace(
+                    go.Scatter(
+                        x=[group[0], group[1]], 
+                        y=[feature, feature], 
+                        fill="toself",
+                        fillcolor=color_value,
+                        marker_symbol='line-ns',
+                        mode='markers+lines',
+                        name=feature,
+                        legendgroup=feature,
+                        line_color=color_value,
+                        line_width=10,
+                        customdata=["".join(attr), "".join(attr)],
+                        hovertemplate='%{customdata}',
+                        textfont=dict(size=10),
+                        showlegend=False,
+                    )
+                )
+        # ----------------------------------------------
+        # TODO: Resolve how to include gene names without
+        # exponentially increasing load time. 
+        # import statistics
+        # if (genes) and (feature == 'gene'):
+        #     fig.add_annotation(
+        #         x=statistics.median(x_values),
+        #         y=y_values[0],
+        #         text=genes[0],
+        #         showarrow=False,
+        #         yshift=-15,
+        #         # visible=False,
+        #     )
     fig.update_layout(
-        hovermode="x unified",
         showlegend=True,
         legend=dict(
             orientation="h",
@@ -1507,19 +1489,16 @@ def build_gff_figure(
             x=0,
             traceorder='normal',
         ),
+        margin=dict(t=40, b=10),
         template=template,
         title='',
-        margin=dict(
-            l=62,
-            r=50,
-            b=20,
-            t=20,
-        ),
-        height=150*len(features_graphed),
-        font=dict(family=font_family,),
+        title_x=0.5,
+        height=100*len(features_graphed),
+        font=dict(family=font_family),
+        hovermode='closest',
     )
     fig.update_xaxes(
-        range=dataRange,
+        range=[min_range, max_range],
         title='Position',
         matches="x",
         rangemode="tozero",
@@ -1527,14 +1506,15 @@ def build_gff_figure(
         showgrid=xaxis_gridlines,
     )
     fig.update_yaxes(
-        range=[0, len(features_graphed)+1],
         fixedrange=True,
-        showticklabels=False,
         showgrid=yaxis_gridlines,
         title='',
         linewidth=axis_line_width,
+        categoryorder='array',
+        categoryarray=category_order_sorting(list(gff_df.feature.unique())),
     )
     return fig
+
 
 # ----------------------------------------------------------------------------------------
 # ------------------------------- Quantile Graph Functions -------------------------------
@@ -1854,22 +1834,16 @@ def build_whole_genome_rug_plot(
     wg_squish_expand,
     font_family,
 ):
-    df = df[(df['TopologyID'].isin(currTopologies)) & (df['Chromosome'].isin(chromGroup))]
     grouped_topology_df = df.groupby(by='TopologyID')
     num_chroms = len(df['Chromosome'].unique())
     chrom_row_dict = {chrom:i for chrom, i in zip(chrom_order, range(1, len(df['Chromosome'].unique())+1, 1))}
     chrom_shapes = []
     row_height = [1]*num_chroms
     # --- Build figure ---
-    if len(df) > 40000:
-        fig = no_tree_data(template, "Too many data points to plot")
-        return fig
-    # If chromosome name longer than 5 characters, use subplot titles 
-    # instead of row ittles
     if df.Chromosome.map(len).max() > 5:
         fig = make_subplots(
             rows=num_chroms,
-            subplot_titles=chrom_row_dict.keys(),
+            subplot_titles=[c for c in chrom_row_dict.keys()],
             shared_xaxes=True,
             cols=1,
             row_heights=row_height,
@@ -1976,7 +1950,7 @@ def build_whole_genome_rug_plot(
                 t=20,
                 b=30,
             ),
-            height=100*num_chroms,
+            height=100+(125*num_chroms),
             shapes=chrom_shapes,
             title_x=0.5,
             font=dict(family=font_family,),
@@ -1998,7 +1972,7 @@ def build_whole_genome_rug_plot(
                 t=20,
                 b=30,
             ),
-            height=50*num_chroms,
+            height=100+(100*num_chroms),
             shapes=chrom_shapes,
             title_x=0.5,
             font=dict(family=font_family,),
@@ -2073,16 +2047,11 @@ def build_whole_genome_tile_plot(
 
     Returns: List of figures to display
     """
-    df = df[df['TopologyID'].isin(currTopologies)]
-    df = df[df['Chromosome'].isin(chromGroup)]
     grouped_topology_df = df.groupby(by='TopologyID')
-    num_chroms = len(df['Chromosome'].unique())
+    num_chroms = len(chrom_order)
     chrom_row_dict = {chrom:i for chrom, i in zip(chrom_order, range(1, len(chrom_order)+1, 1))}
     chrom_shapes = []
     # --- Build figure ---
-    if len(df) > 40000:
-        fig = no_tree_data(template, "Too many data points to plot")
-        return fig
     # If longest chromosome name longer 
     # than 5 characters, use subplot titles 
     # instead of row titles
@@ -2216,7 +2185,8 @@ def build_whole_genome_tile_plot(
                     itemsizing='constant',
                 ),
                 hovermode="x unified",
-                height=75*num_chroms,
+                # height=75*num_chroms,
+                height=200+(75*num_chroms),
                 shapes=chrom_shapes,
                 title_x=0.5,
                 font=dict(family=font_family,),
@@ -3109,23 +3079,12 @@ def valid_gff_gtf(i):
     :return: True or False
     :rtype: bool
     """
+    gffdf = pd.read_csv(i, sep="\t", comment="#", nrows=1)
     try:
-        with open(i) as h:
-            for l in h.readlines():
-                if l[0] == "#":
-                    continue
-                else:
-                    length = len(l.strip().split("\t"))
-                    if length == 9:
-                        return True
-                    else:
-                        return False
-    except:
-        length = len(i.read().split("\n")[0].strip("\r").split("\t"))
-        if length == 9:
-            return True
-        else:
-            return False
+        assert len(gffdf.loc[0]) == 9
+        return True
+    except AssertionError:
+        return False
 
 # ---------------------------------------------------------------------------------
 # --------------------------- Tree Prune Export Tools -----------------------------

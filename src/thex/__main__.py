@@ -3,7 +3,7 @@ Author: Andrew Harris
 Python Version: Python3.8.3
 """
 import argparse
-from pathlib import Path
+from thex.version import __version__
 
 from gevent import monkey
 from gevent.pywsgi import WSGIServer
@@ -43,6 +43,12 @@ def display_page(pathname):
 def main():
     parser = argparse.ArgumentParser(description='Tree House Explorer Genome Browser')
     parser.add_argument(
+        '-v',
+        '--version',
+        action='version',
+        version=f'%(prog)s v{__version__}'
+    )
+    parser.add_argument(
         '--host',
         type=str,
         action='store',
@@ -57,6 +63,9 @@ def main():
         help='Port number (default: 8050)',
     )
     args = parser.parse_args()
+    
+    # app.run_server(debug=True, port=args.port, host=args.host)
+    
     print(f"Tree House Explorer running on http://{args.host}:{args.port}/")
     geventOpt = {
         'GATEWAY_INTERFACE': 'CGI/1.1',

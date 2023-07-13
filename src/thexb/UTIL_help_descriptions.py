@@ -178,3 +178,11 @@ class HelpDesc():
     def ignore_missing(self):
         msg="Ignore sites with missing data when calculating p-distance (default: True)"
         return msg
+    
+    def add_ref_suffix(self):
+        msg="Add suffix '_reference' to reference sample of p-distance calculation (default: True)"
+        return msg
+    
+    def rootTVkeepparaphyetic(self):
+        msg="Keep window if outgroup is not monophyletic (default: False)"
+        return msg

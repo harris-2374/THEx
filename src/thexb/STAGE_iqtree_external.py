@@ -2,6 +2,7 @@ import logging
 import os
 
 from ete3 import Tree
+from ete3.parser.newick import NewickError
 import pandas as pd
 
 ############################### Set up logger #################################
@@ -33,77 +34,75 @@ def remove_heterotachy_info(l):
     else:
         return l
 
+def update_df(treeviewer_df, chrom, end, tree):
+    treeviewer_df = pd.concat([
+        treeviewer_df,
+        pd.DataFrame({
+            'Chromosome': str(chrom),
+            'Window': int(end),
+            'NewickTree': str(tree),
+        }, index=[0]),
+    ], ignore_index=True)
+    return treeviewer_df
 
-def create_TreeViewer_input(filtered_tree_outdir, treeViewer_filename):
-    treeviewer_df = pd.DataFrame(columns=['Chromosome', 'Window', 'NewickTree'])
-    chrom_dirs = [c for c in filtered_tree_outdir.iterdir() if c.is_dir()]
-    if len(chrom_dirs) == 0:
-        run_type = "single-dir"
-    else:
-        run_type = "sub-dirs"
-    idx = 0
 
+def create_TreeViewer_input(EXTERNAL_PATH, treeviewer_filename):
+    treeviewer_df = pd.DataFrame(columns=['Chromosome', 'Window', 'NewickTree', 'TopologyID'])
+    chrom_dirs = [c for c in EXTERNAL_PATH.iterdir() if c.is_dir()]
+    run_type = "single-dir" if len(chrom_dirs) == 0 else "sub-dirs"
     if run_type == "sub-dirs":
         for chrom in chrom_dirs:
-            chrom_files = [f for f in chrom.iterdir() if f.is_file()]
+            chrom_files = [f for f in chrom.iterdir() if f.suffix in ['.contree']]
             for f in chrom_files:
                 if "-DROPPED" in f.name:
-                    chrom = f.stem.strip('-DROPPED.fasta').split("_")[0]
-                    end = f.stem.strip('-DROPPED.fasta').split("_")[-1]
-                    treeviewer_df.at[idx, 'Chromosome'] = str(chrom)
-                    treeviewer_df.at[idx, 'Window'] = int(end)
-                    treeviewer_df.at[idx, 'NewickTree'] = str("NoTree")
-                    idx += 1
+                    treeviewer_df = update_df(treeviewer_df, chrom, end, 'NoTree')
                     continue
-                else:
-                    chrom = f.stem.strip('-DROPPED.fasta').split("_")[0]
-                    end = f.stem.strip('-DROPPED.fasta').split("_")[-1]
+                try:
+                    chrom = f.stem.strip('-DROPPED').split("_")[0]
+                    end = f.stem.strip('-DROPPED').split("_")[-1]
                     raw_tree = open(f).readlines()[0].strip()
-                    trimmed_tree = remove_heterotachy_info(raw_tree)
-                    try:
-                        tree = Tree(trimmed_tree)
-                    except:
-                        print(tree, f)
-                    treeviewer_df.at[idx, 'Chromosome'] = str(chrom)
-                    treeviewer_df.at[idx, 'Window'] = int(end)
-                    treeviewer_df.at[idx, 'NewickTree'] = str(tree.write())
-                    idx += 1
+                    tree = Tree(remove_heterotachy_info(raw_tree))
+                    treeviewer_df = update_df(treeviewer_df, chrom, end, tree.write())
                     continue
-    elif run_type == "single-file":
-        chrom_files = [f for f in filtered_tree_outdir.iterdir() if f.is_file()]
+                except IndexError:
+                    logger.info(f"File failed - Empty file: {f.name}")
+                    treeviewer_df = update_df(treeviewer_df, chrom, end, 'NoTree')
+                    continue
+                except NewickError:
+                    logger.info(f"File failed - NewickError: {f.name}")
+                    treeviewer_df = update_df(treeviewer_df, chrom, end, 'NoTree')
+                    continue
+    elif run_type == "single-dir":
+        chrom_files = [f for f in EXTERNAL_PATH.iterdir() if f.suffix in ['.contree']]
         for f in chrom_files:
             if "-DROPPED" in f.name:
-                chrom = f.stem.strip('-DROPPED.fasta').split("_")[0]
-                end = f.stem.strip('-DROPPED.fasta').split("_")[-1]
-                treeviewer_df.at[idx, 'Chromosome'] = str(chrom)
-                treeviewer_df.at[idx, 'Window'] = int(end)
-                treeviewer_df.at[idx, 'NewickTree'] = str("NoTree")
-                idx += 1
+                treeviewer_df = update_df(treeviewer_df, chrom, end, 'NoTree')
                 continue
-            else:
-                chrom = f.stem.strip('-DROPPED.fasta').split("_")[0]
-                end = f.stem.strip('-DROPPED.fasta').split("_")[-1]
+            try:
+                chrom = f.stem.strip('-DROPPED').split("_")[0]
+                end = f.stem.strip('-DROPPED').split("_")[-1]
                 raw_tree = open(f).readlines()[0].strip()
-                trimmed_tree = remove_heterotachy_info(raw_tree)
-                try:
-                    tree = Tree(trimmed_tree)
-                except:
-                    print(tree, f)
-                treeviewer_df.at[idx, 'Chromosome'] = str(chrom)
-                treeviewer_df.at[idx, 'Window'] = int(end)
-                treeviewer_df.at[idx, 'NewickTree'] = str(tree.write())
-                idx += 1
+                tree = Tree(remove_heterotachy_info(raw_tree))
+                treeviewer_df = update_df(treeviewer_df, chrom, end, tree.write())
                 continue
+            except IndexError:
+                logger.info(f"File failed - Empty file: {f.name}")
+                treeviewer_df = update_df(treeviewer_df, chrom, end, 'NoTree')
+                continue
+            except NewickError:
+                logger.info(f"File failed - NewickError: {f.name}")
+                treeviewer_df = update_df(treeviewer_df, chrom, end, 'NoTree')
+                continue
+    treeviewer_df['TopologyID'] = [None]*len(treeviewer_df)
     treeviewer_df.sort_values(by=['Chromosome', "Window"], inplace=True)
-    treeviewer_df.to_excel(treeViewer_filename, index=False)
-    logger.info(f"TreeViewer file written to: {treeViewer_filename}")
+    treeviewer_df.to_excel(treeviewer_filename, index=False)
+    logger.info(f"TreeViewer file written to: {treeviewer_filename}")
     return
 
 
 ############################### Main Function ################################
-def iq_tree_external(EXTERNAL_PATH, treeViewer_filename, WORKING_DIR, LOG_LEVEL):
-    """Iterate through each trimal filetered chromosome directory and filter windows based on missingness."""
-    set_logger_level(WORKING_DIR, LOG_LEVEL)  # Setup log file level
-    create_TreeViewer_input(EXTERNAL_PATH, treeViewer_filename)
+def iq_tree_external(EXTERNAL_PATH, treeviewer_filename, WORKING_DIR, LOG_LEVEL):
+    set_logger_level(WORKING_DIR, LOG_LEVEL)
+    create_TreeViewer_input(EXTERNAL_PATH, treeviewer_filename)
     return
 

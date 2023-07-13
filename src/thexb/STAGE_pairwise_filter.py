@@ -37,10 +37,11 @@ def WriteOUT(outfile, output):
 
 
 def FormatDictionaryOfNucleotideSeqsToFasta(d, Ns):
-    o = ''
+    o=[]
     for k in Ns:
-        o += '>%s\n%s\n' % (k, "\n".join(textwrap.wrap(d[k], width=80)))
-    return o
+        seq_wrapped = '\n'.join(textwrap.wrap(d[k], width=80, break_on_hyphens=False))
+        o.append(f">{k}\n{seq_wrapped}")
+    return "\n".join(o)
 
 
 def Return1IfValueIsGreaterThanCutoffForAllInDictionary(perccov, PCcutoff, countshit):
@@ -65,10 +66,10 @@ def CalculatePercentAACoverageForEachSequenceInDictionary(newseqs, lenseqs, PW_M
             if char != '-' and char != PW_MISSING_CHAR and char.isalpha():
                 num_valid_bases += 1.0
         try:
-            perccov[n] = float(num_valid_bases/lenseqs)  # NOTE: Keeping as float to match other input variable data types
+            perccov[n] = float(num_valid_bases/lenseqs)
         except ZeroDivisionError:
-            print(num_valid_bases, lenseqs)
-            exit(1)
+            logger.error(f"No sequence found - check input and restart run.")
+            exit()
     return perccov
 
 
@@ -230,9 +231,6 @@ def run_pw_per_chromosome(
     init_valid_files = [f.stem for f in files if '-DROPPED' not in f.name]
     filtered_chrom_outdir = filtered_outdir / f'{chrom.name}'
     filtered_chrom_outdir.mkdir(parents=True, exist_ok=True)
-    from pprint import pprint as print
-    print(chrom) if chrom.name == "test_output2/trimal_filtered_windows/chrY_random_Un_scaffold_91" else None
-    # print(files)
 
     countshit = dict()
     countperccovcutoff=0
@@ -246,7 +244,7 @@ def run_pw_per_chromosome(
                 oh.write("")
                 continue
 
-        with Fasta(str(f), 'fasta') as fh:
+        with Fasta(f.as_posix()) as fh:
             try:
                 assert(len(fh.keys()) > 0)
                 seqs, lenseqs = _make_seq_dict(fh)

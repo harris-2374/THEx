@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Author: Andrew Harris
-"""
 # --- Native Python imports ---
 import argparse
 import configparser
@@ -11,9 +7,9 @@ import shutil
 import sys
 from pathlib import Path
 # -- version import --
+from thex.version import __version__
 # --- Toolkit util imports ---
 from thexb.UTIL_converters import convert_window_size_to_int
-# from thexb.UTIL_parsers import break_alignment_to_chroms
 from thexb.UTIL_help_descriptions import HelpDesc
 # --- Toolkit pipeline stage imports ---
 from thexb.STAGE_minifastas import fasta_windower
@@ -22,15 +18,12 @@ from thexb.STAGE_iqtree_external import iq_tree_external
 from thexb.STAGE_pairwise_estimator import pairwise_estimator
 from thexb.STAGE_pairwise_filter import pairwise_filter
 from thexb.STAGE_pdistance_calculator import pdistance_calculator
-# from STAGE_percent_missing import percent_missing
 from thexb.STAGE_trimal import trimal
 from thexb.STAGE_topobinner import topobinner
 from thexb.STAGE_phybin import phybin
 # --- Toolkit additional tools ----
 from thexb.TOOL_parse_treeviewer_per_chromosome import parse_treeviewer_per_chromosome
-# from thexb.TOOL_parsimony_informative_sites import parsimony_informative_sites
 from thexb.TOOL_root_TreeViewer_file import root_TreeViewer_file
-# from thexb.TOOL_tree_viewer_input_stats import tv_input_stats
 # --- Toolkit Template imports ---
 from thexb.TEMPLATE_make_config import config_template
 
@@ -69,6 +62,7 @@ class InvalidIQTREERoot(Error):
 class InvalidMultiprocess(Error):
     "Raise when Multiprocess input is not an integer"
     pass
+
 ############################## Helper Functions ###############################
 def _check_log_level(l):
     valid_types = {'NOTSET': 0, 'DEBUG': 10, 'INFO': 20, 'WARNING': 30, 'ERROR': 40, 'CRITICAL': 50}
@@ -93,10 +87,13 @@ def _check_input(INPUT):
 ############################### Main Function #################################
 def main():
     """ This section of code handles all input data and calls methods. """
-    """===================================================================="""
+    # ====================================================================
     # --- Argparse Setup ---
-    parser = argparse.ArgumentParser(prog="THExBuilder", description='Command line suite of pipelines and tools for Tree House Explorer')
-    general = parser.add_argument_group('general inputs')
+    parser = argparse.ArgumentParser(
+        description='Command line suite of pipelines and tools for Tree House Explorer',
+        formatter_class=lambda prog: argparse.HelpFormatter(prog,max_help_position=100)
+    )
+    general = parser.add_argument_group('General options')
     tv_pipeline = parser.add_argument_group('Tree Viewer pipeline stages')
     # tv_pipeline_opts = parser.add_argument_group('TreeViewer Pipeline General Arguments (no config file)')
     tv_trimal_opts = parser.add_argument_group('Trimal arguments (--trimal)')
@@ -104,16 +101,16 @@ def main():
     tv_pw_filter_opts = parser.add_argument_group('Pairwise Filter arguments (--pw_filter)')
     tv_iqtree_opts = parser.add_argument_group('IQ-Tree arguments (--iqtree)')
     tv_topobinner_opts = parser.add_argument_group('Topobinner arguments (--topobinner)')
-    tv_additional_tools = parser.add_argument_group('Tree Viewer pipeline tools')
+    tv_additional_tools = parser.add_argument_group('Additional tools')
+    tv_additional_tool_options = parser.add_argument_group('Additional tool options')
     pdist_pipeline = parser.add_argument_group('p-Distance Tracer tools (--pdistance)')
     sys_options = parser.add_argument_group('System Options')
-    # Optional arguments
+    # Parser arguments
     parser.add_argument(
         '-v',
         '--version',
-        action="store_true",
-        help="print version",
-        default=False,
+        action='version',
+        version=f'%(prog)s v{__version__}'
     )
     # General inputs (ignored when config file is provided)
     general.add_argument(
@@ -159,14 +156,6 @@ def main():
         help=HelpDesc().config(),
         metavar='',
     )
-    # general.add_argument(
-    #     '--range',
-    #     type=str,
-    #     action='store',
-    #     help=HelpDesc().range(),
-    #     default=None,
-    #     metavar='',
-    # )
     
     # Tree Viewer Pipeline Stage Arguments
     tv_pipeline.add_argument(
@@ -239,7 +228,7 @@ def main():
     tv_additional_tools.add_argument(
         '--rootTV',
         action="store",
-        nargs="*",  # 0 or more values expected => creates a list
+        nargs="+",  # 0 or more values expected => creates a list
         metavar='',
         type=str,
         help=HelpDesc().rootTV(),
@@ -251,9 +240,13 @@ def main():
     #     help=HelpDesc().parsimony(),
     #     default=False,
     # )
-    # Minifastas
-    
-    
+    # Additional tool options
+    tv_additional_tool_options.add_argument(
+        '--keep_paraphyletic',
+        action="store_true",
+        help=HelpDesc().rootTVkeepparaphyetic(),
+        default=False,
+    )
     # Trimal
     tv_trimal_opts.add_argument(
         '--trimal_gap_threshold',
@@ -431,6 +424,12 @@ def main():
         help=HelpDesc().ignore_missing(),
         default=True,
     )
+    pdist_pipeline.add_argument(
+        '--pdist_add_ref_suffix',
+        action='store_false',
+        help=HelpDesc().add_ref_suffix(),
+        default=True,
+    )
     
     # Dev Tools
     sys_options.add_argument(
@@ -450,11 +449,7 @@ def main():
         metavar='',
     )
     args = parser.parse_args()
-    """===================================================================="""
-    # -- Print Version --
-    if args.version:
-        print(f"v1.0.2")
-        exit(0)
+    # ====================================================================
     # --- General inputs ---
     INPUT = Path(args.input) if args.input else None
     OUTPUT = Path(args.output) if args.output else None
@@ -490,6 +485,7 @@ def main():
     PARSE_TREEVIEWER_FILE = args.parse_treeviewer
     # PARSIMONY = args.parsimony_summary
     TV_OUTGROUP = args.rootTV
+    TV_OUTGROUP_REMOVE = args.keep_paraphyletic
     # --- p-distance ---
     P_DISTANCE = args.pdistance
     REFERENCE = args.reference
@@ -497,6 +493,7 @@ def main():
     PDIST_MISSING_CHAR = str(args.pdist_missing_character)
     PDIST_IGNORE_N = bool(args.pdist_ignore_missing)
     PDIST_FILENAME = str(args.pdist_filename)
+    PDIST_REF_SUFFIX = args.pdist_add_ref_suffix
     # --- Config + Logging ---
     CONFIG_FILE = args.config
     LOG_LEVEL = args.log_level
@@ -511,7 +508,7 @@ def main():
     if len(sys.argv)==1:
         parser.print_help(sys.stderr)
         sys.exit()
-    """===================================================================="""
+    # ====================================================================
     if CONFIG_FILE:
         # Read config parser + setup input variables
         config = configparser.ConfigParser()
@@ -600,14 +597,14 @@ def main():
             print(f"ERROR: Topobinner 'rooted_trees' input can only be Y or N")
             exit(1)
 
-        """===================================================================="""
+        # ====================================================================
         # Check log level input + return log level int
         try:
             LOG_LEVEL = _check_log_level(LOG_LEVEL)
             assert type(LOG_LEVEL) == int
         except AssertionError:
             raise AssertionError("Invalid log level - Provide NOTSET, DEBUG, INFO, WARNING, ERROR, or CRITICAL")
-        """===================================================================="""
+        # ====================================================================
     elif INPUT:
         # General Input Variables
         try:
@@ -682,7 +679,7 @@ def main():
     # logger.info(f"Command: thexb {args_list}")
     # -- Run Stages --
     try:
-        """===================================================================="""
+        # ====================================================================
         # --- p-Distance Tracer Pipeline ---
         if P_DISTANCE:
             # Input/output
@@ -727,11 +724,12 @@ def main():
                 WORKING_DIR,
                 WINDOW_SIZE_INT,
                 PDIST_IGNORE_N,
+                PDIST_REF_SUFFIX,
                 MULTIPROCESS,
                 LOG_LEVEL,
             )
             pass
-        """===================================================================="""
+        # ====================================================================
         # Addition TreeViewer Tools
         # if PARSIMONY:
         #     # Check/set logging
@@ -758,7 +756,7 @@ def main():
             logger.info("=========== Root Tree Viewer File =========== ")
             logger.info("============================================= ")
             logger.info(f"Command: thexb {args_list}")
-            root_TreeViewer_file(INPUT, WORKING_DIR, TV_OUTGROUP, WORKING_DIR, LOG_LEVEL)
+            root_TreeViewer_file(INPUT, WORKING_DIR, TV_OUTGROUP, TV_OUTGROUP_REMOVE, WORKING_DIR, LOG_LEVEL)
 
         # --- Tree Viewer Pipeline ---
         if ALL_STEPS:
@@ -958,7 +956,7 @@ def main():
 
         if TOPOBIN:
             # Input/Output
-            TREEVIEWER_FN = INPUT if (INPUT) and (not CONFIG_FILE) else TREEVIEWER_FN
+            TREEVIEWER_FN = (INPUT if (INPUT) and (not CONFIG_FILE) else TREEVIEWER_FN)
             UPDATED_TV_FILENAME = WORKING_DIR / f"{TREEVIEWER_FN.stem}.topobinner.xlsx"
             logger.info("")
             logger.info("=======================================")

@@ -19,8 +19,8 @@ def missing_sample_check(init_files, filtered_files):
             try:
                 assert init_file.name == filtered_file.name
                 # Load Fasta file
-                init_fasta = Fasta(init_file.as_posix(), 'fasta')
-                filtered_fasta = Fasta(filtered_file.as_posix(), 'fasta')
+                init_fasta = Fasta(init_file.as_posix())
+                filtered_fasta = Fasta(filtered_file.as_posix())
                 # List fasta headers
                 init_keys = [k for k in init_fasta.keys()]
                 filtered_keys = [k for k in filtered_fasta.keys()]

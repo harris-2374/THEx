@@ -49,7 +49,7 @@ def coverage_and_median(random_windows):
     """ Calculate the average coverage per-sample """
     per_sample_cov_list = dict()
     for f in random_windows:
-        with Fasta(f.as_posix(), 'fasta') as fh:
+        with Fasta(f.as_posix()) as fh:
             headers = [k for k in fh.keys()]
             for sample in headers:
                 seq = fh[sample][:].seq
@@ -73,7 +73,7 @@ def p_distance(random_windows, PW_REF):
     """ Calculate the average p-distance per-sample """
     collective_pdistance = dict()
     for f in random_windows:
-        with Fasta(f.as_posix(), 'fasta') as fh:
+        with Fasta(f.as_posix()) as fh:
             headers = [k for k in fh.keys()]
             try:
                 assert PW_REF in headers

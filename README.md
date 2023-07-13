@@ -1,6 +1,6 @@
 # Tree House Explorer
 
- Tree House Explorer (THEx) is a novel phylogenomic genome browser that host a growing collection of interactive dashboards. It was developed using [Plotly's](https://plotly.com/) open source framework [Dash](https://dash.plotly.com/) for building extremely powerful and customizable analytical web applications.
+Tree House Explorer (THEx) is a novel phylogenomic genome browser that host a growing collection of interactive dashboards. It was developed using [Plotly's](https://plotly.com/) open source framework [Dash](https://dash.plotly.com/) for building extremely powerful and customizable analytical web applications.
 
 ## THEx on Windows
 
@@ -8,7 +8,7 @@ Two of the main dependencies required for the THExBuilder's Tree Viewer pipeline
 
 ## Browser Support
 
-THEx is supported by most major browsers (Google Chrome, Safari, Firefox, etc.) except Internet Explorer.  
+THEx is supported by most major browsers (Google Chrome, Safari, Firefox, etc.) except Internet Explorer.
 
 # Conda Installation
 
@@ -16,18 +16,18 @@ Steps:
 
 1. Install [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
    - Windows 10 installation [documentation](https://docs.conda.io/projects/conda/en/latest/user-guide/install/windows.html)
-   - Mac OS installation [documentation](https://docs.conda.io/projects/conda/en/latest/user-guide/install/macos.html)  
+   - Mac OS installation [documentation](https://docs.conda.io/projects/conda/en/latest/user-guide/install/macos.html)
    - Linux installation [documentation](https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html)
 2. Add required channels
-    > $ conda config --add channels bioconda
-    >
-    > $ conda config --add channels conda-forge
+   > $ conda config --add channels bioconda
+   >
+   > $ conda config --add channels conda-forge
 3. Create a new conda environment
-    > $ conda create -n thex_env
+   > $ conda create -n thex_env
 4. Activate conda environment
-    > $ conda activate thex_env
+   > $ conda activate thex_env
 5. Install THEx
-    > $ conda install thex -c ajharris_2374  
+   > $ conda install thex -c ajharris_2374
 
 # THEx Start-up
 
@@ -45,7 +45,7 @@ optional arguments:
   --port PORT  Port number (default: 8050)
 ```
 
-Once the session is running, the message ```Tree House Explorer running on http://127.0.0.1:8050/``` will appear. Click or copy/paste the address into your browser to access your session.
+Once the session is running, the message `Tree House Explorer running on http://127.0.0.1:8050/` will appear. Click or copy/paste the address into your browser to access your session.
 
 # THExBuilder
 
@@ -131,21 +131,21 @@ All of the pipelines for THExBuilder start with multiple-sequence alignment fast
 Below is an example of the directory and file structure of the input multiple-sequence fasta files.
 
 ```
-MultiAlignmentDir/  
-| -- chr1.fasta  
-| -- chr2.fasta  
-| -- chX.fasta  
+MultiAlignmentDir/
+| -- chr1.fasta
+| -- chr2.fasta
+| -- chX.fasta
 ```
 
-Example file: (chr1.fasta)  
+Example file: (chr1.fasta)
 
 ```
-> Sample 1  
-AGTGCTAGC…GTTC  
-> Sample 2  
-AGTGTCCTA…GCTT  
-> Sample 3  
-AGTGTCGTA…GCTT   
+> Sample 1
+AGTGCTAGC…GTTC
+> Sample 2
+AGTGTCCTA…GCTT
+> Sample 3
+AGTGTCGTA…GCTT
 ```
 
 ## Tree Viewer Pipeline
@@ -157,7 +157,7 @@ The Tree Viewer pipeline is designed to take multi-alignment fasta files, parse 
 The Tree Viewer pipeline is designed to be flexible, providing the user the ability to run each step independently or continuously one after another. Although the option to run the pipeline start-to-finish is available, it is recommended to run each step individually to inspect and validate the intermediate results. However, if you choose to run it all at once you will need to create a configuration file and pass it to the '-c' argument.
 
 ```
-thexb --tv_all -c config.ini  
+thexb --tv_all -c config.ini
 ```
 
 ### 1. Fasta Windowing
@@ -166,7 +166,7 @@ The fasta windowing step takes a directory containing multi-alignment fasta file
 Note that this step can return thousands of files, so be mindful when opening these directories in a file browser. Fasta files can be uncompressed or compressed using bgzip.
 
 ```
-thexb --minifastas -c config.ini  
+thexb --minifastas -c config.ini
 ```
 
 or
@@ -175,7 +175,7 @@ or
 thexb --minifastas \
 -i ./chromosome_alignments \
 -o ./output \
---window_size 100kb 
+--window_size 100kb
 ```
 
 ### 2. Trimal Gap Trimming
@@ -218,7 +218,7 @@ thexb --pw_filter \
 --pw_max_pdist 1.0 \
 --pw_zscore_cutoff 2 \
 --pw_missing_char "-" \
---pw_seq_coverage 0.8 
+--pw_seq_coverage 0.8
 ```
 
 ### 4. IQ-Tree: Maximum Likelihood Phylogeny Inference
@@ -244,7 +244,7 @@ thexb --iqtree \
 
 ### 5. Topobinner
 
-Topobinner is a tool used to organize and label identical tree topologies based on RF-distance. Trees are treated as equal topologies when their RF-distance is equal to 0 (9-10). The trees are binned and then labeled based on their whole genome frequency, meaning the most frequent topology in the genome will be labeled Tree1, then Tree 2 for the second most frequent topology, and so on. Once this step is completed, an updated Tree Viewer file with binned topologies will be generated and placed in the defined output directory. It should also be noted that users can also pass a Tree Viewer input file produced by the File Pruning export option (see Tree Viewer export options section for more details) in Tree Viewer to bin new trees that have been pruned into a subset from a larger Tree Viewer input file. No special steps need to be taken to run this, simply provide the Tree Viewer input file as you would normally.  
+Topobinner is a tool used to organize and label identical tree topologies based on RF-distance. Trees are treated as equal topologies when their RF-distance is equal to 0 (9-10). The trees are binned and then labeled based on their whole genome frequency, meaning the most frequent topology in the genome will be labeled Tree1, then Tree 2 for the second most frequent topology, and so on. Once this step is completed, an updated Tree Viewer file with binned topologies will be generated and placed in the defined output directory. It should also be noted that users can also pass a Tree Viewer input file produced by the File Pruning export option (see Tree Viewer export options section for more details) in Tree Viewer to bin new trees that have been pruned into a subset from a larger Tree Viewer input file. No special steps need to be taken to run this, simply provide the Tree Viewer input file as you would normally.
 
 ```
 thexb --topobinner -c config.ini
@@ -273,12 +273,21 @@ thexb --phybin_external \
 
 ### Root trees in a Tree Viewer file
 
-Tree Viewer files with unrooted trees can quickly be rooted to an outgroup by using the --rootTV option in THExBuilder. Multiple outgroup taxa can be defined by providing the names of samples in a space delimited list after the --rootTV argument.
+Tree Viewer files with unrooted trees can quickly be rooted to an outgroup by using the --rootTV option in THExBuilder. Multiple outgroup taxa can be defined by providing the names of samples in a space delimited list after the --rootTV argument. For trees where the outgroup taxa are para/polyphyletic, the default behavior is to filter out the windows from the analysis. If you wish to include the topologies in the analysis, use the --keep_paraphyletic
 
 ```
 thexb --rootTV sample1 sample2 \
--i TVinput.xlsx
+-i TVinput.xlsx \
 -o ./output/
+```
+
+or
+
+```
+thexb --rootTV sample1 sample2 \
+-i TVinput.xlsx \
+-o ./output/ \
+--keep_paraphyletic
 ```
 
 ## Signal Tracer p-Distance Pipeline

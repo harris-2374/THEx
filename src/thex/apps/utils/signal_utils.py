@@ -59,7 +59,7 @@ def single_chromosome_graph_line(
     fig.update_yaxes(
         title="Value",
         range=[0, y_max],
-        fixedrange=True,
+        # fixedrange=True,
         showgrid=yaxis_gridlines,
     )
     fig.update_traces(
@@ -116,7 +116,7 @@ def single_chromosome_graph_scatter(
     fig.update_yaxes(
         title="Value",
         range=[0, y_max],
-        fixedrange=True,
+        # fixedrange=True,
         showgrid=yaxis_gridlines,
     )
     fig.update_traces(

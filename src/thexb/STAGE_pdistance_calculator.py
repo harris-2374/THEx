@@ -66,18 +66,22 @@ def generate_windows(seq_len, WINDOW_SIZE_INT):
     windows = windows[:-1] + [(windows[-1][0], seq_len)]
     return windows
 
-def make_init_df(chromosome, queries, windows):
+
+def make_init_df(chromosome, queries, windows, REFERENCE):
     """
     Generate initial dataframe with all data except p-distance values
     """
-    chromosome_list = [chromosome]*(len(windows)*len(queries))
-    start_positions_list = [w[0] for w in windows]*len(queries)
-    end_positions_list = [w[1] for w in windows]*len(queries)
-    windows_list = [w[0] for w in windows]*len(queries)  # Sets window as starting position
+    # +1 is for reference
+    chromosome_list = [chromosome]*(len(windows)*(len(queries)+1))
+    start_positions_list = [w[0] for w in windows]*(len(queries)+1)
+    end_positions_list = [w[1] for w in windows]*(len(queries)+1)
+    windows_list = [w[0] for w in windows]*(len(queries)+1)
     sample_list = []
 
     for q in queries:
         sample_list = sample_list + [q]*len(windows)
+
+    sample_list = sample_list + [REFERENCE]*len(windows)
 
     return pd.DataFrame({
         "Chromosome": chromosome_list,
@@ -85,14 +89,14 @@ def make_init_df(chromosome, queries, windows):
         "End": end_positions_list,
         "Window": windows_list,
         "Sample": sample_list,
-        "Value": [pd.NA]*(len(windows)*len(queries)),
+        "Value": [pd.NA]*(len(windows)*(len(queries)+1)),
     })
 
 
 def pairwise_pi(seq1, seq2, PDIST_MISSING_CHAR, PDIST_IGNORE_N, PDIST_THRESHOLD):
     """
     Written by Jonas Lescroart - 10/26/2022
-    Edited by Andrew Harris - 10/26/2022
+    Edited by Andrew Harris - 10/26/2022 - 4/10/2023
 
     Returns a single per-site pi value for two DNA sequences of equal length.
     Sites with missing data are optionally ignored in the final calculation.
@@ -123,7 +127,8 @@ def pairwise_pi(seq1, seq2, PDIST_MISSING_CHAR, PDIST_IGNORE_N, PDIST_THRESHOLD)
     else:
         return variable_sites/(invariable_sites + variable_sites)
 
-def process_file(f, WINDOW_SIZE_INT, PDIST_MISSING_CHAR, PDIST_THRESHOLD, REFERENCE, PDIST_IGNORE_N):
+
+def process_file(f, WINDOW_SIZE_INT, PDIST_MISSING_CHAR, PDIST_THRESHOLD, REFERENCE, PDIST_IGNORE_N, PDIST_REF_SUFFIX):
     """
     Load fasta file and calculate p-distance for file. Return resulting dataframe.   
     """
@@ -140,7 +145,7 @@ def process_file(f, WINDOW_SIZE_INT, PDIST_MISSING_CHAR, PDIST_THRESHOLD, REFERE
         logger.info(f"Number of windows: {len(windows)}")
         logger.info(f"Samples to test: {queries}")
         # Make pandas df to save results
-        df = make_init_df(chromosome, queries, windows)
+        df = make_init_df(chromosome, queries, windows, REFERENCE)
         # Calculate p-distance - version 1 (testing)
         for n, row in enumerate(df.to_dict('records')):
             s1 = time()
@@ -153,8 +158,9 @@ def process_file(f, WINDOW_SIZE_INT, PDIST_MISSING_CHAR, PDIST_THRESHOLD, REFERE
             )
             logger.debug(f"{n:,}/{len(df):,} windows complete for {chromosome} :: Time:{time()- s1:.2} seconds :: DF Memory: {df.memory_usage(deep=True).sum():,}") if n%10 == 0 else None
             continue
+        if PDIST_REF_SUFFIX:
+            df['Sample'] = df['Sample'].apply(lambda x: f'{x}_reference' if x == REFERENCE else x)
         df.drop(columns=['Start', 'End'], inplace=True)
-    
     logger.debug(f"-- Completed {f.name} --")
     return df
 
@@ -169,6 +175,7 @@ def pdistance_calculator(
     WORKING_DIR,
     WINDOW_SIZE_INT,
     PDIST_IGNORE_N,
+    PDIST_REF_SUFFIX,
     MULTIPROCESS,
     LOG_LEVEL,
 ):
@@ -189,7 +196,7 @@ def pdistance_calculator(
     # Create the pool
     process_pool = Pool(processes=cpu_count)
     # Start processes in the pool
-    dfs = process_pool.starmap(process_file, [(f, WINDOW_SIZE_INT, PDIST_MISSING_CHAR, PDIST_THRESHOLD, REFERENCE, PDIST_IGNORE_N) for f in files])
+    dfs = process_pool.starmap(process_file, [(f, WINDOW_SIZE_INT, PDIST_MISSING_CHAR, PDIST_THRESHOLD, REFERENCE, PDIST_IGNORE_N, PDIST_REF_SUFFIX) for f in files])
     # Concat dataframes to one dataframe
     try:
         pdist_df = pd.concat(dfs, ignore_index=True)

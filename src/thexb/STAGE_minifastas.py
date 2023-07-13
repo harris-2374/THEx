@@ -41,7 +41,7 @@ def parse_chromosome_into_windows(f, WORKING_DIR, WINDOW_SIZE_INT):
     """Split each chromosome file (or just file) into n-bp windows"""
     chromosome = str(f.stem).replace(".fasta", "").replace(".fa", "").replace(".fna", "").replace(".fas", "")
     try:
-        with Fasta(f) as fasta_file:
+        with Fasta(f.as_posix()) as fasta_file:
             headers = fasta_file.keys()
             windowed_outdir = WORKING_DIR / 'windowed_fastas' / f"{chromosome}"
             windowed_outdir.mkdir(parents=True, exist_ok=True)

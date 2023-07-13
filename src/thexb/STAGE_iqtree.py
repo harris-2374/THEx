@@ -75,7 +75,7 @@ def update_tree_files(filtered_outdir):
 
 
 def create_TreeViewer_input(filtered_outdir, treeViewer_filename):
-    treeviewer_df = pd.DataFrame(columns=['Chromosome', 'Window', 'NewickTree'])
+    treeviewer_df = pd.DataFrame(columns=['Chromosome', 'Window', 'NewickTree', 'TopologyID'])
     chrom_dirs = [c for c in filtered_outdir.iterdir() if c.is_dir()]
     index = 0
     for chromosome in chrom_dirs:
@@ -181,10 +181,11 @@ def iq_tree(filtered_indir, filtered_outdir, treeViewer_filename,
     check_iqtree_install()
     # Set cpu count for multiprocessing
     if type(MULTIPROCESS) == int:
-        # Ensure not asking for more than available
-        assert int(MULTIPROCESS) <= os.cpu_count()
         try:
-            if IQT_CORES == "AUTO":
+            if int(MULTIPROCESS) > os.cpu_count():
+                print(f"Requested more CPU's than available on system. Reducing from {int(MULTIPROCESS)} to {os.cpu_count()}")
+                cpu_count = os.cpu_count()
+            elif IQT_CORES == "AUTO":
                 cpu_count = MULTIPROCESS
                 pass
             elif int(MULTIPROCESS) < int(IQT_CORES):

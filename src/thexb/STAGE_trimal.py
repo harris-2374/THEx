@@ -43,7 +43,7 @@ def minimum_seq_length_check(filtered_files, TRIMAL_MIN_LENGTH):
         if "-DROPPED" in f.name:
             continue
         # Load Fasta file
-        with Fasta(f.as_posix(), 'fasta') as filtered_fasta:
+        with Fasta(f.as_posix()) as filtered_fasta:
             filtered_headers = [k for k in filtered_fasta.keys()]
             # Iterate through headers and drop if header is missing
             for k in filtered_headers:
@@ -79,7 +79,7 @@ def missing_sample_check(filtered_files, TRIMAL_DROP_WINDOWS):
             elif n > 1000:
                 break
             # Load Fasta file
-            with Fasta(f.as_posix(), 'fasta') as filtered_fasta:
+            with Fasta(f.as_posix()) as filtered_fasta:
                 filtered_headers = [k for k in filtered_fasta.keys()]
                 count.append(len(filtered_headers))
                 n += 1
@@ -91,7 +91,7 @@ def missing_sample_check(filtered_files, TRIMAL_DROP_WINDOWS):
                 continue
             else:
                 # Load Fasta file
-                with Fasta(f.as_posix(), 'fasta') as filtered_fasta:
+                with Fasta(f.as_posix()) as filtered_fasta:
                     filtered_headers = [k for k in filtered_fasta.keys()]
                     if len(filtered_headers) != expected_sample_count:
                         # Remove old index fai file
