@@ -1,0 +1,22 @@
+name: thex_env
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - biopython=1.79
+  - dash-bootstrap-components=0.12.2
+  - dash-daq=0.5.0
+  - dash=1.21.0
+  - ete3=3.1.2
+  - gevent=21.1.2
+  - iqtree=2.2.0.3
+  - openpyxl=3.0.7
+  - p-tqdm=1.4.0
+  - pandas=1.2.4
+  - plotly=5.10.0
+  - pyfaidx=0.7.1
+  - python=3.9.5
+  - scikit-posthocs=0.7.0
+  - trimal=1.4.1
+  - werkzeug=2.0.3
