@@ -2,10 +2,6 @@
 
 Tree House Explorer (THEx) is a novel phylogenomic genome browser that hosts a growing collection of interactive dashboards. It was developed using [Plotly's](https://plotly.com/) open-source framework [Dash](https://dash.plotly.com/) for building extremely powerful and customizable analytical web applications.
 
-## THEx on Windows
-
-THEx for Windows now comes with THExBuilder. However, [Trimal](http://trimal.cgenomics.org/) and [IQ-Tree](http://www.iqtree.org/) are not included in the dependencies on Conda, so those have to be manually installed. Paths to the executables can be provided to the _--trimal-path_ and _--iqtree-path_ arguments. These parameters are also visible to Mac and Linux users.
-
 ## Installation
 
 1. Install [Miniconda](https://docs.conda.io/en/latest/miniconda.html)
