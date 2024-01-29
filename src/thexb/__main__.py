@@ -6,11 +6,14 @@ import os
 import shutil
 import sys
 from pathlib import Path
+
 # -- version import --
 from thex.version import __version__
+
 # --- Toolkit util imports ---
 from thexb.UTIL_converters import convert_window_size_to_int
 from thexb.UTIL_help_descriptions import HelpDesc
+
 # --- Toolkit pipeline stage imports ---
 from thexb.STAGE_minifastas import fasta_windower
 from thexb.STAGE_iqtree import iq_tree
@@ -21,9 +24,11 @@ from thexb.STAGE_pdistance_calculator import pdistance_calculator
 from thexb.STAGE_trimal import trimal
 from thexb.STAGE_topobinner import topobinner
 from thexb.STAGE_phybin import phybin
+
 # --- Toolkit additional tools ----
 from thexb.TOOL_parse_treeviewer_per_chromosome import parse_treeviewer_per_chromosome
 from thexb.TOOL_root_TreeViewer_file import root_TreeViewer_file
+
 # --- Toolkit Template imports ---
 from thexb.TEMPLATE_make_config import config_template
 
@@ -31,8 +36,8 @@ from thexb.TEMPLATE_make_config import config_template
 ############################### Set up logger #################################
 def set_logger(WORKING_DIR, LOG_LEVEL):
     logger = logging.getLogger(__name__)
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-    file_handler = logging.FileHandler(WORKING_DIR / 'logs/' / 'THExBuilder.log')
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    file_handler = logging.FileHandler(WORKING_DIR / "logs/" / "THExBuilder.log")
     file_handler.setFormatter(formatter)
     stream_handler = logging.StreamHandler()
     logger.addHandler(file_handler)
@@ -40,36 +45,64 @@ def set_logger(WORKING_DIR, LOG_LEVEL):
     logger.setLevel(LOG_LEVEL)
     return logger
 
+
 ############################# Custom Exceptions ###############################
 class Error(Exception):
     """Base class for other exceptions"""
+
     pass
+
+
 class ConfigNotFound(Error):
     """Raise when config file is required but not present"""
+
     pass
+
+
 class InputNotFound(Error):
     """Raise when input file is required but not present"""
+
     pass
+
+
 class InputNotProvided(Error):
     """Raise when not input is provided"""
+
     pass
+
+
 class InvalidInput(Error):
     """Raise when -i is provided and --tv_all is called"""
+
     pass
+
+
 class InvalidIQTREERoot(Error):
     """Raise when IQ-TREE rooted input from -c is not Y or N"""
+
     pass
+
+
 class InvalidMultiprocess(Error):
-    "Raise when Multiprocess input is not an integer"
+    """Raise when Multiprocess input is not an integer"""
+
     pass
+
 
 ############################## Helper Functions ###############################
 def _check_log_level(l):
-    valid_types = {'NOTSET': 0, 'DEBUG': 10, 'INFO': 20, 'WARNING': 30, 'ERROR': 40, 'CRITICAL': 50}
-    if l in valid_types.keys():
+    valid_types = {
+        "NOTSET": 0,
+        "DEBUG": 10,
+        "INFO": 20,
+        "WARNING": 30,
+        "ERROR": 40,
+        "CRITICAL": 50,
+    }
+    if valid_types.get(l):
         return valid_types[l]
-    else:
-        return False
+    return False
+
 
 def _check_input(INPUT):
     try:
@@ -81,155 +114,164 @@ def _check_input(INPUT):
             INPUT = Path(INPUT)
             return
     except InputNotFound:
-        print("ERROR: FileNotFound: Pathway provided to (-i) could not be found or is not provided. Please check input pathway and try again.")
+        print(
+            "ERROR: FileNotFound: Pathway provided to (-i) could not be found or is not provided. Please check input pathway and try again."
+        )
         exit(1)
+
 
 ############################### Main Function #################################
 def main():
-    """ This section of code handles all input data and calls methods. """
+    """This section of code handles all input data and calls methods."""
     # ====================================================================
     # --- Argparse Setup ---
     parser = argparse.ArgumentParser(
-        description='Command line suite of pipelines and tools for Tree House Explorer',
-        formatter_class=lambda prog: argparse.HelpFormatter(prog,max_help_position=100)
+        description="Command line suite of pipelines and tools for Tree House Explorer",
+        formatter_class=lambda prog: argparse.HelpFormatter(
+            prog, max_help_position=100
+        ),
     )
-    general = parser.add_argument_group('General options')
-    tv_pipeline = parser.add_argument_group('Tree Viewer pipeline stages')
+    general = parser.add_argument_group("General options")
+    tv_pipeline = parser.add_argument_group("Tree Viewer pipeline stages")
     # tv_pipeline_opts = parser.add_argument_group('TreeViewer Pipeline General Arguments (no config file)')
-    tv_trimal_opts = parser.add_argument_group('Trimal arguments (--trimal)')
-    tv_pw_estimator_opts = parser.add_argument_group('Pairwise Estimator arguments (--pw_estimator)')
-    tv_pw_filter_opts = parser.add_argument_group('Pairwise Filter arguments (--pw_filter)')
-    tv_iqtree_opts = parser.add_argument_group('IQ-Tree arguments (--iqtree)')
-    tv_topobinner_opts = parser.add_argument_group('Topobinner arguments (--topobinner)')
-    tv_additional_tools = parser.add_argument_group('Additional tools')
-    tv_additional_tool_options = parser.add_argument_group('Additional tool options')
-    pdist_pipeline = parser.add_argument_group('p-Distance Tracer tools (--pdistance)')
-    sys_options = parser.add_argument_group('System Options')
+    tv_trimal_opts = parser.add_argument_group("Trimal arguments (--trimal)")
+    tv_pw_estimator_opts = parser.add_argument_group(
+        "Pairwise Estimator arguments (--pw_estimator)"
+    )
+    tv_pw_filter_opts = parser.add_argument_group(
+        "Pairwise Filter arguments (--pw_filter)"
+    )
+    tv_iqtree_opts = parser.add_argument_group("IQ-Tree arguments (--iqtree)")
+    tv_topobinner_opts = parser.add_argument_group(
+        "Topobinner arguments (--topobinner)"
+    )
+    tv_additional_tools = parser.add_argument_group("Additional tools")
+    tv_additional_tool_options = parser.add_argument_group("Additional tool options")
+    pdist_pipeline = parser.add_argument_group("p-Distance Tracer tools (--pdistance)")
+    sys_options = parser.add_argument_group("System Options")
+    program_options = parser.add_argument_group("Program Options")
     # Parser arguments
     parser.add_argument(
-        '-v',
-        '--version',
-        action='version',
-        version=f'%(prog)s v{__version__}'
+        "-v", "--version", action="version", version=f"thexb v{__version__}"
     )
     # General inputs (ignored when config file is provided)
     general.add_argument(
-        '-i',
-        '--input',
+        "-i",
+        "--input",
         action="store",
         help=HelpDesc().input(),
         default=None,
-        metavar='',
+        metavar="\b",
     )
     general.add_argument(
-        '-o',
-        '--output',
+        "-o",
+        "--output",
         type=str,
         action="store",
         help=HelpDesc().output(),
         default=None,
-        metavar='',
+        metavar="\b",
     )
     general.add_argument(
-        '-r',
-        '--reference',
+        "-r",
+        "--reference",
         type=str,
-        action='store',
+        action="store",
         help=HelpDesc().reference(),
         default=None,
-        metavar='',
+        metavar="\b",
     )
     general.add_argument(
-        '-w',
-        '--window_size',
+        "-w",
+        "--window_size",
         type=str,
         action="store",
         help=HelpDesc().window_size(),
-        default='100kb',
-        metavar='',
+        default="100kb",
+        metavar="\b",
     )
     general.add_argument(
-        '-c',
-        '--config',
+        "-c",
+        "--config",
         type=str,
-        action='store',
+        action="store",
         help=HelpDesc().config(),
-        metavar='',
+        metavar="\b",
     )
-    
+
     # Tree Viewer Pipeline Stage Arguments
     tv_pipeline.add_argument(
-        '--tv_all',
+        "--tv_all",
         action="store_true",
         help=HelpDesc().tv_all(),
         default=False,
     )
     tv_pipeline.add_argument(
-        '--minifastas',
+        "--minifastas",
         action="store_true",
         help=HelpDesc().fasta_windowing(),
         default=False,
     )
     tv_pipeline.add_argument(
-        '--trimal',
+        "--trimal",
         action="store_true",
         help=HelpDesc().trimal(),
         default=False,
     )
     tv_pipeline.add_argument(
-        '--pw_estimator',
+        "--pw_estimator",
         action="store_true",
         help=HelpDesc().pw_estimator(),
         default=False,
     )
     tv_pipeline.add_argument(
-        '--pw_filter',
+        "--pw_filter",
         action="store_true",
         help=HelpDesc().pw_filter(),
         default=False,
     )
     tv_pipeline.add_argument(
-        '--iqtree',
+        "--iqtree",
         action="store_true",
         help=HelpDesc().iqtree(),
         default=False,
     )
     tv_pipeline.add_argument(
-        '--iqtree_external',
+        "--iqtree_external",
         action="store_true",
         help=HelpDesc().iqtree_external(),
         default=False,
     )
     tv_pipeline.add_argument(
-        '--topobinner',
+        "--topobinner",
         action="store_true",
         help=HelpDesc().topobinner(),
         default=False,
     )
     tv_pipeline.add_argument(
-        '--phybin_external',
+        "--phybin_external",
         action="store_true",
         help=HelpDesc().phybin(),
         default=False,
     )
     # Toolkit
     tv_additional_tools.add_argument(
-        '--tv_config_template',
+        "--tv_config_template",
         action="store_true",
         help=HelpDesc().config_template(),
         default=False,
     )
     tv_additional_tools.add_argument(
-        '--parse_treeviewer',
+        "--parse_treeviewer",
         action="store_true",
         help=HelpDesc().parse_treeviewer(),
         default=False,
     )
     tv_additional_tools.add_argument(
-        '--rootTV',
+        "--rootTV",
         action="store",
         nargs="+",  # 0 or more values expected => creates a list
-        metavar='',
+        metavar="\b",
         type=str,
         help=HelpDesc().rootTV(),
         default=False,
@@ -242,212 +284,229 @@ def main():
     # )
     # Additional tool options
     tv_additional_tool_options.add_argument(
-        '--keep_paraphyletic',
+        "--keep_paraphyletic",
         action="store_true",
         help=HelpDesc().rootTVkeepparaphyetic(),
         default=False,
     )
     # Trimal
     tv_trimal_opts.add_argument(
-        '--trimal_gap_threshold',
+        "--trimal_gap_threshold",
         type=float,
         action="store",
         help=HelpDesc().trimal_gap_threshold(),
         default=0.9,
-        metavar='',
+        metavar="\b",
     )
     tv_trimal_opts.add_argument(
-        '--trimal_min_seq_len',
+        "--trimal_min_seq_len",
         type=str,
         action="store",
         help=HelpDesc().trimal_minSeqLen(),
-        default='1kb',
-        metavar='',
+        default="1kb",
+        metavar="\b",
     )
     tv_trimal_opts.add_argument(
-        '--trimal_drop_windows',
+        "--trimal_drop_windows",
         action="store_false",
         help=HelpDesc().trimal_dropwindows(),
         default=True,
     )
     # Pairwise estimator
     tv_pw_estimator_opts.add_argument(
-        '--pwe_percent_chrom',
+        "--pwe_percent_chrom",
         type=float,
         action="store",
         help=HelpDesc().pwe_percent_chrom(),
         default=0.1,
-        metavar='',
+        metavar="\b",
     )
     # Pairwise filter
     tv_pw_filter_opts.add_argument(
-        '--pw_subwindow_size',
+        "--pw_subwindow_size",
         type=str,
         action="store",
         help=HelpDesc().pw_window_size(),
-        default='100bp',
-        metavar='',
+        default="100bp",
+        metavar="\b",
     )
     tv_pw_filter_opts.add_argument(
-        '--pw_step',
+        "--pw_step",
         type=str,
         action="store",
         help=HelpDesc().pw_step(),
-        default='10bp',
-        metavar='',
+        default="10bp",
+        metavar="\b",
     )
     tv_pw_filter_opts.add_argument(
-        '--pw_min_seq_len',
+        "--pw_min_seq_len",
         type=str,
         action="store",
         help=HelpDesc().pw_min_seq_len(),
-        default='1000bp',
-        metavar='',
+        default="1000bp",
+        metavar="\b",
     )
     tv_pw_filter_opts.add_argument(
-        '--pw_max_pdist',
+        "--pw_max_pdist",
         type=float,
         action="store",
         help=HelpDesc().pw_max_pdist(),
         default=0.15,
-        metavar='',
+        metavar="\b",
     )
     tv_pw_filter_opts.add_argument(
-        '--pw_zscore_cutoff',
+        "--pw_zscore_cutoff",
         type=float,
         action="store",
         help=HelpDesc().pw_zscore_cutoff(),
         default=0.15,
-        metavar='',
+        metavar="\b",
     )
     tv_pw_filter_opts.add_argument(
-        '--pw_seq_coverage',
+        "--pw_seq_coverage",
         type=float,
         action="store",
         help=HelpDesc().pw_seq_coverage(),
         default=0.9,
-        metavar='',
+        metavar="\b",
     )
     tv_pw_filter_opts.add_argument(
-        '--pw_missing_char',
+        "--pw_missing_char",
         type=str,
         action="store",
         help=HelpDesc().pw_missing_char(),
-        default='N',
-        metavar='',
+        default="N",
+        metavar="\b",
     )
     tv_pw_filter_opts.add_argument(
-        '--pw_exclude',
+        "--pw_exclude",
         type=str,
         action="store",
         help=HelpDesc().pw_exclude(),
         default=None,
-        metavar='',
+        metavar="\b",
     )
     # IQ-Tree
     tv_iqtree_opts.add_argument(
-        '--iqtree_model',
+        "--iqtree_model",
         type=str,
         action="store",
         help=HelpDesc().iqtree_model(),
-        default='GTR*H4',
-        metavar='',
+        default="GTR*H4",
+        metavar="\b",
     )
     tv_iqtree_opts.add_argument(
-        '--iqtree_bootstrap',
+        "--iqtree_bootstrap",
         type=int,
         action="store",
         help=HelpDesc().iqtree_bootstrap(),
         default=1000,
-        metavar='',
+        metavar="\b",
     )
     tv_iqtree_opts.add_argument(
-        '--iqtree_cpu_cores',
+        "--iqtree_cpu_cores",
         type=str,
         action="store",
         help=HelpDesc().iqtree_cpu_cores(),
-        default='AUTO',
-        metavar='',
+        default="AUTO",
+        metavar="\b",
     )
     tv_iqtree_opts.add_argument(
-        '--tv_file_name',
+        "--tv_file_name",
         type=str,
         action="store",
         help=HelpDesc().tv_file_name(),
         default="TreeViewer_input_file.xlsx",
-        metavar='',
+        metavar="\b",
     )
     # Topobinner
     tv_topobinner_opts.add_argument(
-        '--tb_rooted_trees',
+        "--tb_rooted_trees",
         type=str,
         action="store",
         help=HelpDesc().tb_rooted_trees(),
         default="N",
         choices=["Y", "N"],
-        metavar='',
+        metavar="\b",
     )
     # p-distance calculator
     pdist_pipeline.add_argument(
-        '--pdistance',
+        "--pdistance",
         action="store_true",
         help=HelpDesc().pdistance(),
         default=False,
     )
     pdist_pipeline.add_argument(
-        '--pdist_filename',
+        "--pdist_filename",
         type=str,
         action="store",
-        metavar='',
+        metavar="\b",
         help=HelpDesc().pdistance_filename(),
-        default='SignalTracer_input.tsv',
+        default="SignalTracer_input.tsv",
     )
     pdist_pipeline.add_argument(
-        '--pdist_threshold',
+        "--pdist_threshold",
         type=float,
         action="store",
-        metavar='',
+        metavar="\b",
         help=HelpDesc().pdistance_threshold(),
         default=0.75,
     )
     pdist_pipeline.add_argument(
-        '--pdist_missing_character',
+        "--pdist_missing_character",
         type=str,
-        action='store',
+        action="store",
         help=HelpDesc().missing_character(),
-        default='N',
-        metavar='',
+        default="N",
+        metavar="\b",
     )
     pdist_pipeline.add_argument(
-        '--pdist_ignore_missing',
-        action='store_false',
+        "--pdist_ignore_missing",
+        action="store_false",
         help=HelpDesc().ignore_missing(),
         default=True,
     )
     pdist_pipeline.add_argument(
-        '--pdist_add_ref_suffix',
-        action='store_false',
+        "--pdist_add_ref_suffix",
+        action="store_false",
         help=HelpDesc().add_ref_suffix(),
         default=True,
     )
-    
     # Dev Tools
     sys_options.add_argument(
-        '--log_level',
+        "--log_level",
         type=str,
         action="store",
         help=HelpDesc().log_level(),
-        default='INFO',
-        metavar='',
+        default="INFO",
+        metavar="\b",
     )
     sys_options.add_argument(
-        '--cpu',
+        "--cpu",
         type=int,
         action="store",
         help=HelpDesc().cpu(),
         default=os.cpu_count(),
-        metavar='',
+        metavar="\b",
     )
+    # Progam options
+    program_options.add_argument(
+        "--trimal-path",
+        type=Path,
+        action="store",
+        help=HelpDesc().trimal_path(),
+        default="trimal",
+        metavar="\b",
+    )
+    program_options.add_argument(
+        "--iqtree-path",
+        type=Path,
+        action="store",
+        help=HelpDesc().iqtree_path(),
+        default="iqtree",
+        metavar="\b",
+    )
+
     args = parser.parse_args()
     # ====================================================================
     # --- General inputs ---
@@ -500,12 +559,15 @@ def main():
     MULTIPROCESS = args.cpu
     # --- Additional Tools ---
     CONFIG_TEMPLATE = args.tv_config_template
+    # --- Program paths ---
+    TRIMAL_PATH = args.trimal_path
+    IQTREE_PATH = args.iqtree_path
     # --- Create Template Files ---
     if CONFIG_TEMPLATE:
         config_template()
         exit()
     # If no argument provided, print help message
-    if len(sys.argv)==1:
+    if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit()
     # ====================================================================
@@ -518,27 +580,29 @@ def main():
             else:
                 config.read(Path(CONFIG_FILE))
         except ConfigNotFound:
-            print("ERROR: FileNotFound: Configuration file called using '-c', but file could not be found. Please check input and rerun")
+            print(
+                "ERROR: FileNotFound: Configuration file called using '-c', but file could not be found. Please check input and rerun"
+            )
             exit(1)
-        
+
         # General Input Variables
         try:
-            INPUT = Path(config['General']['multi_alignment_dir'])
-        except KeyError: # Backward Compatibility
-            INPUT = Path(config['Input Files']['multi_alignment_dir'])
+            INPUT = Path(config["General"]["multi_alignment_dir"])
+        except KeyError:  # Backward Compatibility
+            INPUT = Path(config["Input Files"]["multi_alignment_dir"])
         try:
-            OUTPUT = Path(config['General']['outdir'])
-        except KeyError: # Backward Compatibility
-            OUTPUT = Path(config['Input Files']['outdir'])
+            OUTPUT = Path(config["General"]["outdir"])
+        except KeyError:  # Backward Compatibility
+            OUTPUT = Path(config["Input Files"]["outdir"])
         # Tree Viewer file name
         try:
-            TREEVIEWER_FN = OUTPUT / config['General']['TreeViewer_file_name']
-        except KeyError: # Backward Compatibility
-            TREEVIEWER_FN = OUTPUT / config['Input Files']['TreeViewer_file_name']
-        
+            TREEVIEWER_FN = OUTPUT / config["General"]["TreeViewer_file_name"]
+        except KeyError:  # Backward Compatibility
+            TREEVIEWER_FN = OUTPUT / config["Input Files"]["TreeViewer_file_name"]
+
         # Set the working directory
         if not OUTPUT:
-            WORKING_DIR = Path.cwd() / 'THExBuilderOutput'
+            WORKING_DIR = Path.cwd() / "THExBuilderOutput"
         else:
             WORKING_DIR = Path(OUTPUT)
         WORKING_DIR.mkdir(parents=True, exist_ok=True)
@@ -546,46 +610,56 @@ def main():
         log_dir = WORKING_DIR / "logs/"
         log_dir.mkdir(parents=True, exist_ok=True)
         # Pipeline Variables
-        MULTIPROCESS = config['Processing']['multiprocess']
+        MULTIPROCESS = config["Processing"]["multiprocess"]
         try:
             if not MULTIPROCESS.isnumeric():
                 raise InvalidMultiprocess
             else:
                 MULTIPROCESS = int(MULTIPROCESS)
         except InvalidMultiprocess:
-            print("Invalid input for Multiprocess option. Value must an integer 1-n, where n is the total number of cores available")
+            print(
+                "Invalid input for Multiprocess option. Value must an integer 1-n, where n is the total number of cores available"
+            )
 
-        WINDOW_SIZE_STR = config['Fasta Windower']['window_size']
+        WINDOW_SIZE_STR = config["Fasta Windower"]["window_size"]
         WINDOW_SIZE_INT = convert_window_size_to_int(WINDOW_SIZE_STR)
 
         # Trimal
-        TRIMAL_THRESH = float(config['Trimal']['gap_threshold'])
-        TRIMAL_MIN_LENGTH = convert_window_size_to_int(config['Trimal']['minimum_seq_length'])
-        TRIMAL_DROP_WINDOWS = bool(config['Trimal']['drop_windows'])
+        TRIMAL_THRESH = float(config["Trimal"]["gap_threshold"])
+        TRIMAL_MIN_LENGTH = convert_window_size_to_int(
+            config["Trimal"]["minimum_seq_length"]
+        )
+        TRIMAL_DROP_WINDOWS = bool(config["Trimal"]["drop_windows"])
 
         # Pairwise Filtering Input Variables
-        PW_WINDOW_SIZE = str(config['Pairwise Filter']['filter_window_size'])
-        PW_WINDOW_SIZE_INT = convert_window_size_to_int(config['Pairwise Filter']['filter_window_size'])
-        PW_STEP = str(config['Pairwise Filter']['step'])
-        PW_STEP_INT = convert_window_size_to_int(config['Pairwise Filter']['step'])
-        PW_REF = config['Pairwise Filter']['reference_name']
-        PW_MIN_SEQ_LEN = convert_window_size_to_int(config['Pairwise Filter']['min_seq_len'])
-        PW_PDIST_CUTOFF = float(config['Pairwise Filter']['max_pDistance_cutoff'])
-        PW_ZSCORE = float(config['Pairwise Filter']['Zscore'])
-        PW_PC_CUTOFF = float(config['Pairwise Filter']['pairwise_coverage_cutoff'])
-        PW_EXCLUDE_LIST = config['Pairwise Filter']['exclude_list']
-        PW_MISSING_CHAR = config['Pairwise Filter']['missing_char']
-        
+        PW_WINDOW_SIZE = str(config["Pairwise Filter"]["filter_window_size"])
+        PW_WINDOW_SIZE_INT = convert_window_size_to_int(
+            config["Pairwise Filter"]["filter_window_size"]
+        )
+        PW_STEP = str(config["Pairwise Filter"]["step"])
+        PW_STEP_INT = convert_window_size_to_int(config["Pairwise Filter"]["step"])
+        PW_REF = config["Pairwise Filter"]["reference_name"]
+        PW_MIN_SEQ_LEN = convert_window_size_to_int(
+            config["Pairwise Filter"]["min_seq_len"]
+        )
+        PW_PDIST_CUTOFF = float(config["Pairwise Filter"]["max_pDistance_cutoff"])
+        PW_ZSCORE = float(config["Pairwise Filter"]["Zscore"])
+        PW_PC_CUTOFF = float(config["Pairwise Filter"]["pairwise_coverage_cutoff"])
+        PW_EXCLUDE_LIST = config["Pairwise Filter"]["exclude_list"]
+        PW_MISSING_CHAR = config["Pairwise Filter"]["missing_char"]
+
         # Pairwise Estimator Input Variables
-        PW_EST_PERCENT_CHROM = float(config['Pairwise Estimator']['percent_of_chromosome_to_run'])
+        PW_EST_PERCENT_CHROM = float(
+            config["Pairwise Estimator"]["percent_of_chromosome_to_run"]
+        )
 
         # IQ-TREE Input Variables
-        IQT_MODEL = str(config['IQ-TREE']['model'])
-        IQT_BOOTSTRAP = int(config['IQ-TREE']['bootstrap'])
-        IQT_CORES = str(config['IQ-TREE']['cores_per_job'])
+        IQT_MODEL = str(config["IQ-TREE"]["model"])
+        IQT_BOOTSTRAP = int(config["IQ-TREE"]["bootstrap"])
+        IQT_CORES = str(config["IQ-TREE"]["cores_per_job"])
 
         # TopoBin Input Variables - [Y/N]
-        TOPOBIN_ROOTED = str(config['Topobinner']['rooted_trees'])
+        TOPOBIN_ROOTED = str(config["Topobinner"]["rooted_trees"])
         try:
             if TOPOBIN_ROOTED == "Y":
                 pass
@@ -603,7 +677,9 @@ def main():
             LOG_LEVEL = _check_log_level(LOG_LEVEL)
             assert type(LOG_LEVEL) == int
         except AssertionError:
-            raise AssertionError("Invalid log level - Provide NOTSET, DEBUG, INFO, WARNING, ERROR, or CRITICAL")
+            raise AssertionError(
+                "Invalid log level - Provide NOTSET, DEBUG, INFO, WARNING, ERROR, or CRITICAL"
+            )
         # ====================================================================
     elif INPUT:
         # General Input Variables
@@ -620,10 +696,14 @@ def main():
                 INPUT = Path(INPUT)
                 pass
         except InputNotFound:
-            print("ERROR: FileNotFound: Pathway provided to (-i) could not be found or is not provided. Please check input pathway and try again.")
+            print(
+                "ERROR: FileNotFound: Pathway provided to (-i) could not be found or is not provided. Please check input pathway and try again."
+            )
             exit(1)
         except InvalidInput:
-            print("ERROR: InvalidInput: (-i) argument is not a valid input when running --tv_all, use a configuration file (-c).")
+            print(
+                "ERROR: InvalidInput: (-i) argument is not a valid input when running --tv_all, use a configuration file (-c)."
+            )
             exit(1)
         # Set the working directory
         if not OUTPUT:
@@ -648,10 +728,14 @@ def main():
         if (PW_EXCLUDE_LIST == "None") and (PW_FILTER) and (PW_REF):
             PW_EXCLUDE_LIST = PW_REF
         elif (PW_EXCLUDE_LIST == "None") and (PW_FILTER) and (not PW_REF):
-            print(f"WARNING: --pw_filter requires a reference sample given by the --reference argument or --pw_exclude with the reference provided as one of the options... Please add and rerun")
+            print(
+                f"WARNING: --pw_filter requires a reference sample given by the --reference argument or --pw_exclude with the reference provided as one of the options... Please add and rerun"
+            )
             exit(1)
         if (not PW_REF) and (PW_FILTER):
-            print(f"WARNING: --pw_filter requires a reference sample given by the --reference argument... Please add and rerun")
+            print(
+                f"WARNING: --pw_filter requires a reference sample given by the --reference argument... Please add and rerun"
+            )
             exit(1)
 
     elif TOPOBIN:
@@ -668,7 +752,9 @@ def main():
             if (not CONFIG_FILE) and (not INPUT):
                 raise InputNotProvided
         except InputNotProvided:
-            print("ERROR: FileNotFound: No input file provided, please provide an input (-i) or configuration file (-c)")
+            print(
+                "ERROR: FileNotFound: No input file provided, please provide an input (-i) or configuration file (-c)"
+            )
             exit(1)
     # --- Create log dir ---
     log_dir = WORKING_DIR / "logs/"
@@ -683,14 +769,16 @@ def main():
         # --- p-Distance Tracer Pipeline ---
         if P_DISTANCE:
             # Input/output
-            pdistance_output_dir = WORKING_DIR / 'p-distance/'
+            pdistance_output_dir = WORKING_DIR / "p-distance/"
             pdistance_output_dir.mkdir(parents=True, exist_ok=True)
             # Check log level input + return log level int
             try:
                 LOG_LEVEL = _check_log_level(LOG_LEVEL)
                 assert type(LOG_LEVEL) == int
             except AssertionError:
-                raise AssertionError("Invalid log level - Provide NOTSET, DEBUG, INFO, WARNING, ERROR, or CRITICAL")
+                raise AssertionError(
+                    "Invalid log level - Provide NOTSET, DEBUG, INFO, WARNING, ERROR, or CRITICAL"
+                )
 
             # Make sure all required input variables are valid
             try:
@@ -738,7 +826,7 @@ def main():
         #         assert type(LOG_LEVEL) == int
         #     except AssertionError:
         #         raise AssertionError("Invalid log level - Provide NOTSET, DEBUG, INFO, WARNING, ERROR, or CRITICAL")
-    
+
         #     _check_input(INPUT)
         #     logger.info("============================================= ")
         #     logger.info("======== Parsimony Informative Sites ======== ")
@@ -747,7 +835,7 @@ def main():
         #     parsimony_output_dir.mkdir(parents=True, exist_ok=True)
         #     parsimony_informative_sites(parsimony_output_dir, INPUT, RANGE, WORKING_DIR, LOG_LEVEL)
         #     pass
-        
+
         if TV_OUTGROUP:
             TV_OUTGROUP = list(TV_OUTGROUP)
             _check_input(INPUT)
@@ -756,7 +844,14 @@ def main():
             logger.info("=========== Root Tree Viewer File =========== ")
             logger.info("============================================= ")
             logger.info(f"Command: thexb {args_list}")
-            root_TreeViewer_file(INPUT, WORKING_DIR, TV_OUTGROUP, TV_OUTGROUP_REMOVE, WORKING_DIR, LOG_LEVEL)
+            root_TreeViewer_file(
+                INPUT,
+                WORKING_DIR,
+                TV_OUTGROUP,
+                TV_OUTGROUP_REMOVE,
+                WORKING_DIR,
+                LOG_LEVEL,
+            )
 
         # --- Tree Viewer Pipeline ---
         if ALL_STEPS:
@@ -769,14 +864,16 @@ def main():
                     raise ConfigNotFound
 
             except ConfigNotFound:
-                print("ERROR: FileNotFound: A configuration file was not provided. A configuration file must be provided when running the full pipeline.")
+                print(
+                    "ERROR: FileNotFound: A configuration file was not provided. A configuration file must be provided when running the full pipeline."
+                )
             MINIFASTAS = True
             TRIMAL = True
             PW_FILTER = True
             IQTREE = True
             TOPOBIN = True
             pass
-        
+
         if MINIFASTAS:
             # Input/output
             outdir = WORKING_DIR / "windowed_fastas"
@@ -791,13 +888,20 @@ def main():
             logger.info(f"Output directory: {outdir.as_posix()}")
             logger.info(f"Window size: {WINDOW_SIZE_STR}")
             logger.info("------------------------------------")
-            fasta_windower(INPUT, WORKING_DIR, WINDOW_SIZE_STR, WINDOW_SIZE_INT, MULTIPROCESS, LOG_LEVEL)
+            fasta_windower(
+                INPUT,
+                WORKING_DIR,
+                WINDOW_SIZE_STR,
+                WINDOW_SIZE_INT,
+                MULTIPROCESS,
+                LOG_LEVEL,
+            )
             pass
 
         if TRIMAL:
             # Input/output
-            windowed_fasta_dir = WORKING_DIR / 'windowed_fastas'
-            filtered_outdir = WORKING_DIR / 'trimal_filtered_windows'
+            windowed_fasta_dir = WORKING_DIR / "windowed_fastas"
+            filtered_outdir = WORKING_DIR / "trimal_filtered_windows"
             # Log + run
             logger.info("")
             logger.info("=======================================")
@@ -810,12 +914,22 @@ def main():
             logger.info(f"Minimum post-trimal sequence length: {TRIMAL_MIN_LENGTH}")
             logger.info(f"Drop windows with missing samples: {TRIMAL_DROP_WINDOWS}")
             logger.info("------------------------------------")
-            trimal(windowed_fasta_dir, filtered_outdir, WORKING_DIR, TRIMAL_THRESH, TRIMAL_MIN_LENGTH, TRIMAL_DROP_WINDOWS, MULTIPROCESS, LOG_LEVEL)
+            trimal(
+                windowed_fasta_dir,
+                filtered_outdir,
+                WORKING_DIR,
+                TRIMAL_THRESH,
+                TRIMAL_MIN_LENGTH,
+                TRIMAL_DROP_WINDOWS,
+                TRIMAL_PATH,
+                MULTIPROCESS,
+                LOG_LEVEL,
+            )
             pass
 
         if PW_ESTIMATOR:  # Technically not a part of pipeline, just a tool
             # Input/output
-            filtered_indir = WORKING_DIR / 'trimal_filtered_windows'
+            filtered_indir = WORKING_DIR / "trimal_filtered_windows"
             # Log input parameters
             logger.info("")
             logger.info("=======================================")
@@ -827,18 +941,20 @@ def main():
             logger.info(f"Reference sample: {PW_REF}")
             logger.info(f"Percentage of chromosome sampled: {PW_EST_PERCENT_CHROM}")
             logger.info("------------------------------------")
-            pairwise_estimator(filtered_indir, PW_REF, PW_EST_PERCENT_CHROM, WORKING_DIR, LOG_LEVEL)
+            pairwise_estimator(
+                filtered_indir, PW_REF, PW_EST_PERCENT_CHROM, WORKING_DIR, LOG_LEVEL
+            )
             pass
-        
+
         if PW_FILTER:
             # This is the input when percent missing step is active
             # filtered_indir = WORKING_DIR / 'percent_missing_filtered_windowed_chroms'
-            
+
             # Set exluded info into list
-            PW_EXCLUDE_LIST = list(PW_EXCLUDE_LIST.replace(' ', '').split(','))
-            # Input/output      
-            filtered_indir = WORKING_DIR / 'trimal_filtered_windows'
-            filtered_outdir = WORKING_DIR / 'pairwise_filtered_windows'
+            PW_EXCLUDE_LIST = list(PW_EXCLUDE_LIST.replace(" ", "").split(","))
+            # Input/output
+            filtered_indir = WORKING_DIR / "trimal_filtered_windows"
+            filtered_outdir = WORKING_DIR / "pairwise_filtered_windows"
             # Log input parameters
             logger.info("")
             logger.info("=======================================")
@@ -850,7 +966,9 @@ def main():
             logger.info(f"Output Directory: {filtered_outdir}")
             logger.info(f"Window Size: {PW_WINDOW_SIZE}")
             logger.info(f"Step Size: {PW_STEP}")
-            logger.info(f"Pairwise deletion distance frequency cutoff value: {PW_PDIST_CUTOFF}")
+            logger.info(
+                f"Pairwise deletion distance frequency cutoff value: {PW_PDIST_CUTOFF}"
+            )
             logger.info(f"Reference Sample: {PW_REF}")
             logger.info(f"Minimum Sequence Length: {PW_MIN_SEQ_LEN}")
             logger.info(f"Pairwise Coverage Cutoff: {PW_PC_CUTOFF}")
@@ -879,18 +997,20 @@ def main():
 
         if IQTREE:
             # Input/output
-            filtered_indir = WORKING_DIR / 'pairwise_filtered_windows'
-            filtered_outdir = WORKING_DIR / 'IQ-Tree'
+            filtered_indir = WORKING_DIR / "pairwise_filtered_windows"
+            filtered_outdir = WORKING_DIR / "IQ-Tree"
             # Erase old output directories if present and create new directories
             try:
                 filtered_outdir.mkdir(parents=True)
             except FileExistsError:
-                check = input("IQ-Tree output directories already exist, do you want to overwrite them? [Y,n]: ")
-                if (check == 'y') or (check == "Y"):
+                check = input(
+                    "IQ-Tree output directories already exist, do you want to overwrite them? [Y,n]: "
+                )
+                if (check == "y") or (check == "Y"):
                     shutil.rmtree(filtered_outdir)
                     filtered_outdir.mkdir(parents=True)
                     pass
-                elif check == 'n':
+                elif check == "n":
                     print("Do not overwrite... Exiting")
                     exit(0)
                 elif not check:
@@ -920,6 +1040,7 @@ def main():
                 IQT_MODEL,
                 IQT_BOOTSTRAP,
                 IQT_CORES,
+                IQTREE_PATH,
                 MULTIPROCESS,
                 LOG_LEVEL,
             )
@@ -935,7 +1056,9 @@ def main():
                     INPUT = Path(INPUT)
                     pass
             except InputNotFound:
-                print("ERROR: FileNotFound: Pathway provided to (-i) could not be found or is not provided. Please check input pathway and try again.")
+                print(
+                    "ERROR: FileNotFound: Pathway provided to (-i) could not be found or is not provided. Please check input pathway and try again."
+                )
                 exit(1)
             logger.info("")
             logger.info("=======================================")
@@ -956,7 +1079,7 @@ def main():
 
         if TOPOBIN:
             # Input/Output
-            TREEVIEWER_FN = (INPUT if (INPUT) and (not CONFIG_FILE) else TREEVIEWER_FN)
+            TREEVIEWER_FN = INPUT if (INPUT) and (not CONFIG_FILE) else TREEVIEWER_FN
             UPDATED_TV_FILENAME = WORKING_DIR / f"{TREEVIEWER_FN.stem}.topobinner.xlsx"
             logger.info("")
             logger.info("=======================================")
@@ -975,7 +1098,7 @@ def main():
                 WORKING_DIR,
                 LOG_LEVEL,
             )
-        
+
         if PHYBIN:
             try:
                 if not INPUT:
@@ -986,7 +1109,9 @@ def main():
                     INPUT = Path(INPUT)
                     pass
             except InputNotFound:
-                print("ERROR: FileNotFound: Pathway provided to (-i) could not be found or is not provided. Please check input pathway and try again.")
+                print(
+                    "ERROR: FileNotFound: Pathway provided to (-i) could not be found or is not provided. Please check input pathway and try again."
+                )
                 exit(1)
             logger.info("")
             logger.info("=====================================")
@@ -1003,13 +1128,15 @@ def main():
         # --- THExb Non-pipeline tools ---
         if PARSE_TREEVIEWER_FILE:
             if not OUTPUT:
-                WORKING_DIR = Path().cwd() / 'TreeViewerFilePerChrom/'
+                WORKING_DIR = Path().cwd() / "TreeViewerFilePerChrom/"
                 pass
             else:
-                WORKING_DIR = Path(OUTPUT) / 'TreeViewerFilePerChrom/'
+                WORKING_DIR = Path(OUTPUT) / "TreeViewerFilePerChrom/"
                 pass
             if not INPUT:
-                raise FileNotFoundError("Could not find input file or does not exist, check input and rerun.")
+                raise FileNotFoundError(
+                    "Could not find input file or does not exist, check input and rerun."
+                )
             else:
                 INPUT = Path(INPUT)
                 pass
@@ -1031,4 +1158,3 @@ def main():
         logger.info(f"=======================================")
         exit(0)
     return
-

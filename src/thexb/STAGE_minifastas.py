@@ -21,8 +21,6 @@ from thexb.UTIL_checks import check_fasta
 ############################### Set up logger #################################
 logger = logging.getLogger(__name__)
 def set_logger(WORKING_DIR, LOG_LEVEL):
-    # if os.path.exists(WORKING_DIR / 'logs/fasta_windower.log'):  # Remove existing log file if present
-    #     os.remove(WORKING_DIR / 'logs/fasta_windower.log')
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler = logging.FileHandler(WORKING_DIR / 'logs/minifastas.log')
     file_handler.setFormatter(formatter)
@@ -55,7 +53,6 @@ def parse_chromosome_into_windows(f, WORKING_DIR, WINDOW_SIZE_INT):
                 start_pos = 0
                 end_pos = WINDOW_SIZE_INT
                 for _ in range(number_of_out_seqs):
-                    # current_file_path = windowed_outdir / f"chr-{chromosome}-s-{(start_pos + 1)}-e-{end_pos}.fasta"
                     clean_chromosome_name = chromosome.replace("_", "-")
                     current_file_path = windowed_outdir / f"{clean_chromosome_name}_{(start_pos + 1)}_{end_pos}.fasta"
                     if flag:
@@ -86,7 +83,7 @@ def fasta_windower(MULTI_ALIGNMENT_DIR, WORKING_DIR, WINDOW_SIZE_STR, WINDOW_SIZ
         chrom_files = [f for f in MULTI_ALIGNMENT_DIR.iterdir() if check_fasta(f)]
     logger.info(f"Parsing {len(chrom_files)} files into {WINDOW_SIZE_STR} windows")
     # Set cpu count for multiprocessing
-    if type(MULTIPROCESS) == int:
+    if isinstance(MULTIPROCESS, int):
         # Ensure not asking for more than available
         try:
             assert int(MULTIPROCESS) <= os.cpu_count()
